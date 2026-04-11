@@ -157,7 +157,7 @@
                             <p class="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Riesgo Bajo</p>
                             <h3 id="kpiLow" class="text-3xl font-black text-green-600">0</h3>
                         </div>
-                        <!-- NUEVO INDICADOR: RIESGO PROMEDIO -->
+                        <!-- INDICADOR: RIESGO PROMEDIO -->
                         <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-slate-400">
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Promedio</p>
                             <h3 id="kpiAvgRisk" class="text-3xl font-black text-slate-600">0.0</h3>
@@ -166,6 +166,10 @@
                             <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Salud Institucional</p>
                             <h3 id="kpiAvgScore" class="text-3xl font-black text-indigo-400">0%</h3>
                         </div>
+                    </div>
+
+                    <div id="aiGlobalContainer" class="hidden ai-card p-12 rounded-[4rem]">
+                        <div id="aiGlobalContent" class="ai-formatted-text text-slate-700 text-sm leading-relaxed max-w-none"></div>
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -377,6 +381,28 @@
                         <p id="modalEmail" class="text-sm font-medium text-indigo-600 break-all"></p>
                     </div>
                 </div>
+                
+                <div class="w-full space-y-6 mt-auto">
+                    <div class="bg-white p-8 rounded-[3rem] border shadow-2xl shadow-indigo-100/50">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Global</p>
+                        <span id="modalRiskScoreDisplay" class="text-5xl font-black text-indigo-900 block mb-2">0.0</span>
+                        <span id="modalRiskBadge" class="inline-block px-12 py-3 rounded-full text-xs font-black uppercase">BAJO</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 p-20 overflow-y-auto custom-scroll text-left">
+                <div id="aiPlanContainer" class="hidden mb-12 ai-card p-12 rounded-[4.5rem] animate-in fade-in zoom-in duration-300">
+                    <div class="flex items-center gap-5 mb-8 border-b border-indigo-50 pb-6">
+                        <div class="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg"><svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zM7 10a1 1 0 01-1 1H5a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM10 11a1 1 0 100-2 1 1 0 000 2z"></path></svg></div>
+                        <h4 class="text-indigo-950 font-black uppercase text-sm tracking-[0.2em]">Protocolo de Intervención Estratégico</h4>
+                    </div>
+                    <div id="aiPlanContent" class="ai-formatted-text text-indigo-950 text-sm leading-relaxed"></div>
+                </div>
+
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-[0.3em] mb-12 border-b pb-4 italic text-indigo-900">Ficha Técnica de Vulnerabilidad</h3>
+                <div class="h-[450px] mb-16"><canvas id="modalRadarChart"></canvas></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="modalIndicatorsDetails"></div>
+            </div>
         </div>
     </div>
 
@@ -589,6 +615,46 @@
                 b: studentsData.filter(x => x.nivel === 'Bajo').length 
             };
             
+            const q = `Analiza estadísticas institucionales: Total Estudiantes:${s.t}, Riesgo Alto:${s.a}, Riesgo Medio:${s.m}, Riesgo Bajo:${s.b}. Genera un diagnóstico ejecutivo breve y puntos críticos. Usa ### para títulos y negritas para énfasis.`;
+            
+            try {
+                const result = await callGemini(q, "Eres un consultor experto en permanencia estudiantil.");
+                document.getElementById('aiGlobalContent').innerHTML = formatAiResponse(result);
+                document.getElementById('aiGlobalContainer').classList.remove('hidden');
+                document.getElementById('aiGlobalContainer').scrollIntoView({ behavior: 'smooth' });
+            } catch (e) { 
+                sysLog(e.message, "error"); 
+            } finally { 
+                btnT.textContent = "✨ Obtener Análisis Estratégico IA"; 
+                loading.classList.add('hidden'); 
+            }
+        }
+
+        async function generateAiStudentPlan() {
+            if (!selectedStudent) return;
+            const btnT = document.getElementById('aiPlanBtnText');
+            const loading = document.getElementById('aiPlanLoading');
+            const container = document.getElementById('aiPlanContainer');
+            const content = document.getElementById('aiPlanContent');
+            
+            btnT.textContent = "Generando Plan..."; 
+            loading.classList.remove('hidden');
+            
+            const scores = selectedStudent.scores;
+            const level = selectedStudent.nivel;
+            let q = `Crea un plan de acción para ${selectedStudent.nombre}. Riesgo: ${level}. Scores (10): Académico:${scores.academic}, Permanencia:${scores.permanence}, Mental:${scores.wellbeing}, Económico:${scores.socioeconomic}, Entorno:${scores.health_family}. Diseña 3 fases de intervención inmediata.`;
+            
+            try {
+                const result = await callGemini(q, "Eres un tutor académico de alto nivel.");
+                content.innerHTML = formatAiResponse(result);
+                container.classList.remove('hidden');
+                container.scrollIntoView({ behavior: 'smooth' });
+            } catch (e) { 
+                sysLog(e.message, "error"); 
+            } finally { 
+                btnT.textContent = "✨ Diseñar Plan de Acción IA"; 
+                loading.classList.add('hidden'); 
+            }
         }
 
         function updateCareerOptions() {
