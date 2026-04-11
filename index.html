@@ -157,7 +157,7 @@
                             <p class="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Riesgo Bajo</p>
                             <h3 id="kpiLow" class="text-3xl font-black text-green-600">0</h3>
                         </div>
-                        <!-- INDICADOR: RIESGO PROMEDIO -->
+                        <!-- NUEVO INDICADOR: RIESGO PROMEDIO -->
                         <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-slate-400">
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Promedio</p>
                             <h3 id="kpiAvgRisk" class="text-3xl font-black text-slate-600">0.0</h3>
@@ -388,6 +388,11 @@
                         <span id="modalRiskScoreDisplay" class="text-5xl font-black text-indigo-900 block mb-2">0.0</span>
                         <span id="modalRiskBadge" class="inline-block px-12 py-3 rounded-full text-xs font-black uppercase">BAJO</span>
                     </div>
+                    
+                    <button onclick="generateAiStudentPlan()" id="btnAiPlan" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-[2.5rem] font-black text-[11px] uppercase shadow-2xl transition-all flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95">
+                        <span id="aiPlanBtnText">✨ Diseñar Plan de Acción IA</span>
+                        <div id="aiPlanLoading" class="ai-loading hidden border-white/20 border-t-white"></div>
+                    </button>
                 </div>
             </div>
             <div class="flex-1 p-20 overflow-y-auto custom-scroll text-left">
