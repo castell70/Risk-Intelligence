@@ -388,11 +388,6 @@
                         <span id="modalRiskScoreDisplay" class="text-5xl font-black text-indigo-900 block mb-2">0.0</span>
                         <span id="modalRiskBadge" class="inline-block px-12 py-3 rounded-full text-xs font-black uppercase">BAJO</span>
                     </div>
-                    
-                    <button onclick="generateAiStudentPlan()" id="btnAiPlan" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-[2.5rem] font-black text-[11px] uppercase shadow-2xl transition-all flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95">
-                        <span id="aiPlanBtnText">✨ Diseñar Plan de Acción IA</span>
-                        <div id="aiPlanLoading" class="ai-loading hidden border-white/20 border-t-white"></div>
-                    </button>
                 </div>
             </div>
             <div class="flex-1 p-20 overflow-y-auto custom-scroll text-left">
@@ -494,36 +489,6 @@
         };
 
         Chart.register(ChartDataLabels);
-
-        // API CALL con Reintentos y Backoff
-        async function callGemini(userQuery, systemPrompt = "") {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = { 
-                contents: [{ parts: [{ text: userQuery }] }], 
-                systemInstruction: { parts: [{ text: systemPrompt }] } 
-            };
-            
-            const delays = [1000, 2000, 4000, 8000, 16000];
-
-            for (let i = 0; i <= 5; i++) {
-                try {
-                    const response = await fetch(url, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(payload) 
-                    });
-                    
-                    if (!response.ok) throw new Error("Error en la respuesta de la API");
-                    const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
-                } catch (e) {
-                    if (i === 5) {
-                        throw new Error("No se pudo conectar con el motor de IA tras varios intentos. Verifique su conexión.");
-                    }
-                    await new Promise(r => setTimeout(r, delays[i]));
-                }
-            }
-        }
 
         function closeModal(e) { 
             const modal = document.getElementById('studentModal');
@@ -635,34 +600,7 @@
             }
         }
 
-        async function generateAiStudentPlan() {
-            if (!selectedStudent) return;
-            const btnT = document.getElementById('aiPlanBtnText');
-            const loading = document.getElementById('aiPlanLoading');
-            const container = document.getElementById('aiPlanContainer');
-            const content = document.getElementById('aiPlanContent');
-            
-            btnT.textContent = "Generando Plan..."; 
-            loading.classList.remove('hidden');
-            
-            const scores = selectedStudent.scores;
-            const level = selectedStudent.nivel;
-            let q = `Crea un plan de acción para ${selectedStudent.nombre}. Riesgo: ${level}. Scores (10): Académico:${scores.academic}, Permanencia:${scores.permanence}, Mental:${scores.wellbeing}, Económico:${scores.socioeconomic}, Entorno:${scores.health_family}. Diseña 3 fases de intervención inmediata.`;
-            
-            try {
-                const result = await callGemini(q, "Eres un tutor académico de alto nivel.");
-                content.innerHTML = formatAiResponse(result);
-                container.classList.remove('hidden');
-                container.scrollIntoView({ behavior: 'smooth' });
-            } catch (e) { 
-                sysLog(e.message, "error"); 
-            } finally { 
-                btnT.textContent = "✨ Diseñar Plan de Acción IA"; 
-                loading.classList.add('hidden'); 
-            }
-        }
-
-        function updateCareerOptions() {
+         function updateCareerOptions() {
             const facF = document.getElementById('filterFacultad').value;
             const filterCar = document.getElementById('filterCarrera');
             
