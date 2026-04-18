@@ -1,905 +1,532 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inteligencia de Riesgo Estudiantil v7.3</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <style>
-        @keyframes glow-slow {
-            0%, 100% { opacity: 0.3; filter: drop-shadow(0 0 1px rgba(255,255,255,0.1)); }
-            50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)); }
-        }
-        .animate-slow-glow { animation: glow-slow 5s ease-in-out infinite; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ITCPO - Inteligencia de Riesgo Estudiantil</title>
 
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #f8fafc; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        
-        .sidebar-item.active { background-color: #4338ca; border-left: 4px solid #fb923c; }
-        #toolsDropdown { display: none; position: absolute; right: 0; top: 110%; z-index: 50; }
-        #toolsDropdown.show { display: block; }
-        
-        .tab-content { transition: opacity 0.3s ease; }
+  <!-- Tailwind (cdn) kept for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-        #studentModal, #weightsModal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(15px);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-        #studentModal.show, #weightsModal.show { display: flex; }
+  <!-- Import map for esm.sh modules used by main.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "xlsx": "https://esm.sh/xlsx@0.18.5",
+      "chart.js": "https://esm.sh/chart.js@4.3.0/auto"
+    }
+  }
+  </script>
 
-        .mini-bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; width: 50px; }
-        .mini-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+  <style>
+    /* (kept original app styles, trimmed only nonfunctional duplicates) */
+    @keyframes itcpo-glow {0%,100%{opacity:.3;filter:drop-shadow(0 0 2px rgba(255,255,255,.2))}50%{opacity:1;filter:drop-shadow(0 0 8px rgba(255,255,255,.8))}}
+    .itcpo-animate{animation:itcpo-glow 4s ease-in-out infinite}
+    @keyframes slow-pulse{0%,100%{opacity:1}50%{opacity:.8}}
+    .brand-logo{animation:slow-pulse 3s ease-in-out infinite}
+    .custom-scroll::-webkit-scrollbar{width:5px}
+    .custom-scroll::-webkit-scrollbar-track{background:#f1f1f1}
+    .custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
+    .sidebar-item.active{background-color:#4338ca;border-left:4px solid #fb923c}
+    /* tools dropdown: fixed under the header, centered and wider for full visibility */
+    #toolsDropdown{
+      display:none;
+      position:fixed;
+      left:50%;
+      top:64px; /* place under the header bar */
+      transform:translateX(-50%);
+      z-index:60;
+      min-width:20rem;
+      width:92%;
+      max-width:42rem;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.12);
+    }
+    #toolsDropdown.show{display:block}
+    .tab-content{transition:opacity .3s ease}
+    #studentModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);z-index:100;align-items:center;justify-content:center}
 
-        .ai-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);
-            border: 1px solid #dee5ff;
-            box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.15);
-        }
+    /* avgRisk modal: floating overlay centered above page content */
+    #avgRiskModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:110;align-items:center;justify-content:center;padding:1rem}
+    /* when Tailwind's .hidden is removed, show as flex */
+    #avgRiskModal:not(.hidden){display:flex}
+    #avgRiskModal .avg-modal-card{background:#fff;border-radius:1rem;max-width:900px;width:96%;max-height:80vh;overflow:auto;box-shadow:0 20px 40px rgba(2,6,23,0.2);position:relative;padding:1.25rem}
+    #avgRiskModal .avg-modal-close{position:absolute;top:.5rem;right:.5rem;cursor:pointer;color:#475569}
+    #avgRiskModal .avg-modal-body{font-family:monospace;font-size:.92rem;color:#1f2937;white-space:pre-wrap}
+    #studentModal.show{display:flex}
+    .mini-bar{height:6px;border-radius:3px;background:#e2e8f0;overflow:hidden;width:40px}
+    .mini-bar-fill{height:100%;border-radius:3px;transition:width .8s ease}
+    .reel-slide{display:none}
+    .reel-slide.active{display:block;animation:fade-in .5s ease-out}
+    @keyframes fade-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .ai-loading{border:3px solid #f3f3f3;border-top:3px solid #f97316;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;display:inline-block}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
-        .ai-loading {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #6366f1;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .ai-formatted-text h3 { color: #1e1b4b; font-weight: 800; text-transform: uppercase; font-size: 0.85rem; margin-top: 1.5rem; margin-bottom: 0.75rem; border-left: 4px solid #f97316; padding-left: 0.75rem; }
-        .ai-formatted-text p { margin-bottom: 0.75rem; line-height: 1.6; color: #334155; }
-        .ai-formatted-text ul { margin-bottom: 1.25rem; border-left: 2px solid #e2e8f0; padding-left: 1rem; }
-        .ai-formatted-text li { position: relative; margin-bottom: 0.5rem; color: #475569; }
-        .ai-formatted-text strong { color: #1e1b4b; font-weight: 700; }
-    </style>
+    /* Slow power on/off animation for the small "Powered by ITCPO" label */
+    @keyframes power-fade {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 1; }
+    }
+    .animate-power {
+      animation: power-fade 3.5s ease-in-out infinite;
+    }
+  </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col md:flex-row overflow-hidden font-sans text-slate-900">
 
-    <!-- SIDEBAR -->
-    <aside class="w-full md:w-72 bg-indigo-900 text-white flex flex-col shadow-2xl z-20 text-left">
-        <div class="p-8 text-center border-b border-indigo-800/50">
-            <h2 class="text-[12px] font-black tracking-[0.2em] uppercase text-orange-400 opacity-90 italic leading-tight">Gestión Estratégica de Permanencia</h2>
-        </div>
-
-        <nav class="flex-1 px-4 py-8 space-y-3">
-            <button onclick="showSection('dashboard')" id="btn-dashboard" class="sidebar-item active w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                Dashboard Global
-            </button>
-            <button onclick="showSection('database')" id="btn-database" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                Estudiantes
-            </button>
-            <button onclick="showSection('help')" id="btn-help" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left text-orange-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Ayuda y Soporte
-            </button>
-            <button onclick="showSection('console')" id="btn-console" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left text-indigo-300">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-                Algoritmos & Logs
-            </button>
-        </nav>
-
-        <div class="p-8 border-t border-indigo-800/30">
-            <p class="text-[10px] text-white uppercase tracking-widest italic text-center leading-relaxed animate-slow-glow">Carlos Alfredo Castillo Flores<br>2026 | Versión 7.3</p>
-            <p class="text-[10px] text-white font-black uppercase tracking-[0.3em] text-center mt-2 animate-slow-glow">Powered by ITCPO</p>
-        </div>
-    </aside>
-
-    <!-- MAIN AREA -->
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-        <header class="bg-orange-500 text-white shadow-xl p-5 flex justify-between items-center z-10">
-            <div class="flex items-center gap-4">
-                <h1 class="text-xl font-black uppercase tracking-tighter italic text-white drop-shadow-sm">Risk Intelligence</h1>
-            </div>
-            
-            <div class="relative flex items-center gap-4">
-                <button onclick="toggleTools()" class="bg-white text-orange-600 px-6 py-2.5 rounded-full flex items-center gap-2 font-black text-xs uppercase transition-all shadow-lg hover:scale-105 active:translate-y-0.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-                    Herramientas
-                </button>
-                <div id="toolsDropdown" class="bg-white text-slate-800 rounded-2xl shadow-2xl p-3 w-64 border border-slate-100 top-14">
-                    <label class="flex items-center gap-4 px-4 py-4 hover:bg-orange-50 rounded-xl cursor-pointer transition-colors group text-sm font-bold border-b border-slate-50">
-                        <div class="p-2 bg-orange-100 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg></div>
-                        <span>Importar Encuesta (.xlsx)</span>
-                        <input type="file" id="fileInput" class="hidden" accept=".xlsx, .csv">
-                    </label>
-                    <button onclick="openWeightsModal()" class="w-full flex items-center gap-4 px-4 py-4 hover:bg-indigo-50 rounded-xl transition-colors group text-sm font-bold border-b border-slate-50">
-                        <div class="p-2 bg-indigo-100 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg></div>
-                        <span>Configurar Pesos (%)</span>
-                    </button>
-                    <button onclick="exportToExcel()" class="w-full mt-1 flex items-center gap-4 px-4 py-4 hover:bg-green-50 rounded-xl transition-colors group text-sm font-bold">
-                        <div class="p-2 bg-green-100 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></div>
-                        <span>Exportar Resultados</span>
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <main class="flex-1 overflow-y-auto p-8 custom-scroll bg-slate-50/50">
-            <!-- DASHBOARD -->
-            <section id="section-dashboard" class="tab-content">
-                <div id="welcomeReel" class="bg-white p-16 rounded-[3rem] shadow-2xl border border-slate-100 max-w-4xl mx-auto mt-16 relative overflow-hidden h-[400px] text-center">
-                    <div class="h-24 w-24 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform -rotate-3">
-                        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                    </div>
-                    <h2 class="text-4xl font-black text-slate-800 mb-6 tracking-tight uppercase italic">Bienvenido al Motor de Inteligencia</h2>
-                    <p class="text-slate-500 text-xl leading-relaxed max-w-2xl mx-auto">Cargue sus datos para iniciar la auditoría institucional y obtener diagnósticos estratégicos.</p>
-                </div>
-
-                <div id="statsContainer" class="hidden space-y-8 animate-in fade-in duration-500 mt-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-indigo-600">
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Población Total</p>
-                            <h3 id="kpiTotal" class="text-3xl font-black text-indigo-900">0</h3>
-                        </div>
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-red-500">
-                            <p class="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Riesgo Alto</p>
-                            <h3 id="kpiHigh" class="text-3xl font-black text-red-600">0</h3>
-                        </div>
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-orange-500">
-                            <p class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Riesgo Medio</p>
-                            <h3 id="kpiMedium" class="text-3xl font-black text-orange-600">0</h3>
-                        </div>
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-green-500">
-                            <p class="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Riesgo Bajo</p>
-                            <h3 id="kpiLow" class="text-3xl font-black text-green-600">0</h3>
-                        </div>
-                        <!-- NUEVO INDICADOR: RIESGO PROMEDIO -->
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-slate-400">
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Promedio</p>
-                            <h3 id="kpiAvgRisk" class="text-3xl font-black text-slate-600">0.0</h3>
-                        </div>
-                        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-l-8 border-l-indigo-400">
-                            <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Salud Institucional</p>
-                            <h3 id="kpiAvgScore" class="text-3xl font-black text-indigo-400">0%</h3>
-                        </div>
-                    </div>
-
-                    <div id="aiGlobalContainer" class="hidden ai-card p-12 rounded-[4rem]">
-                        <div id="aiGlobalContent" class="ai-formatted-text text-slate-700 text-sm leading-relaxed max-w-none"></div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="bg-white p-10 rounded-3xl shadow-sm border"><canvas id="chartDistribution"></canvas></div>
-                        <div class="bg-white p-10 rounded-3xl shadow-sm border"><canvas id="chartCategories"></canvas></div>
-                        <div class="bg-white p-10 rounded-3xl shadow-sm border lg:col-span-2">
-                            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Distribución por Facultad / Centro</h4>
-                            <div class="h-[400px]">
-                                <canvas id="chartFaculties"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ESTUDIANTES -->
-            <section id="section-database" class="hidden tab-content">
-                <div class="bg-white rounded-3xl shadow-xl border overflow-hidden">
-                    <div class="p-8 bg-slate-50/50 border-b flex flex-col md:flex-row justify-between items-center gap-6">
-                        <h2 class="text-2xl font-black text-indigo-950 uppercase italic tracking-tighter">
-                            Auditoría Individual <span id="studentCount" class="text-orange-500 ml-3 text-xl font-black"></span>
-                        </h2>
-                        <div class="flex flex-wrap gap-4 justify-end">
-                            <select id="filterFacultad" class="bg-white border rounded-2xl px-6 py-3 text-xs font-black shadow-sm outline-none focus:ring-4 focus:ring-orange-200 transition-all min-w-[200px]">
-                                <option value="all">Todas las Facultades</option>
-                            </select>
-                            <select id="filterCarrera" class="bg-white border rounded-2xl px-6 py-3 text-xs font-black shadow-sm outline-none focus:ring-4 focus:ring-orange-200 transition-all min-w-[200px]">
-                                <option value="all">Todas las Carreras</option>
-                            </select>
-                            <select id="filterRiesgo" class="bg-white border rounded-2xl px-6 py-3 text-xs font-black shadow-sm outline-none focus:ring-4 focus:ring-orange-200 transition-all min-w-[150px]">
-                                <option value="all">Cualquier Riesgo</option>
-                                <option value="Alto">Riesgo Alto</option>
-                                <option value="Medio">Riesgo Medio</option>
-                                <option value="Bajo">Riesgo Bajo</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto max-h-[65vh] custom-scroll">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="sticky top-0 bg-slate-100 z-20 shadow-sm border-b">
-                                <tr class="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em]">
-                                    <th class="p-6">Estudiante</th>
-                                    <th class="p-6 text-center">Académico</th>
-                                    <th class="p-6 text-center">Permanencia</th>
-                                    <th class="p-6 text-center">Mental</th>
-                                    <th class="p-6 text-center">Economía</th>
-                                    <th class="p-6 text-center">Entorno</th>
-                                    <th class="p-6 text-center">Score /10</th>
-                                    <th class="p-6 text-center">Riesgo</th>
-                                </tr>
-                            </thead>
-                            <tbody id="studentTableBody" class="text-slate-700 divide-y cursor-pointer">
-                                <tr><td colspan="8" class="p-32 text-center text-slate-300 font-bold italic">Cargue datos para iniciar.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- HELP -->
-            <section id="section-help" class="hidden tab-content">
-                <div class="max-w-6xl mx-auto space-y-16 pb-32 text-left">
-                    <!-- Introducción -->
-                    <div class="bg-indigo-900 text-white p-16 rounded-[4rem] shadow-2xl relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-10 opacity-10"><svg class="w-48 h-48" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00-.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12V11a1 1 0 102 0v-.88l1.31.562a1 1 0 00-.78 0l7-3a1 1 0 000-1.838l-7-3z"/></svg></div>
-                        <h2 class="text-4xl font-black mb-6 italic uppercase tracking-tighter">Guía del Motor de Riesgo</h2>
-                        <p class="text-indigo-100 text-xl leading-relaxed max-w-4xl">Este sistema traduce las respuestas subjetivas de una encuesta en indicadores numéricos precisos para facilitar la toma de decisiones institucionales.</p>
-                    </div>
-
-                    <!-- 1. Razonamiento del Motor -->
-                    <div class="space-y-8">
-                        <h3 class="text-2xl font-black text-indigo-950 italic flex items-center gap-4"><span class="h-1.5 w-16 bg-orange-500 rounded-full"></span>Funcionamiento del Algoritmo</h3>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div class="bg-white p-10 rounded-[3rem] border-2 border-slate-50 shadow-sm">
-                                <h4 class="text-indigo-600 font-black text-sm uppercase tracking-widest mb-4">🧠 Inteligencia de Polaridad</h4>
-                                <p class="text-slate-600 leading-relaxed mb-6">El motor distingue automáticamente entre preguntas que expresan una fortaleza o una debilidad:</p>
-                                <ul class="space-y-4 text-sm">
-                                    <li class="p-4 bg-red-50 rounded-2xl border border-red-100">
-                                        <strong class="text-red-700 block mb-1">Preguntas de Riesgo (Negativas):</strong>
-                                        <span class="text-slate-600">En frases como <em>"Me siento estresado"</em>, un puntaje alto indica <strong>más riesgo</strong>. El sistema procesa esto de forma directa.</span>
-                                    </li>
-                                    <li class="p-4 bg-green-50 rounded-2xl border border-green-100">
-                                        <strong class="text-green-700 block mb-1">Preguntas de Fortaleza (Positivas):</strong>
-                                        <span class="text-slate-600">En frases como <em>"Me gusta mi carrera"</em>, un puntaje alto indica <strong>menos riesgo</strong>. El motor invierte la escala automáticamente para normalizar el resultado.</span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <div class="bg-white p-10 rounded-[3rem] border-2 border-slate-50 shadow-sm">
-                                <h4 class="text-orange-500 font-black text-sm uppercase tracking-widest mb-4">🚩 Banderas Rojas (Alertas Críticas)</h4>
-                                <p class="text-slate-600 leading-relaxed mb-6">El sistema vigila respuestas extremas en temas sensibles como salud mental o intención de retiro:</p>
-                                <div class="space-y-4">
-                                    <div class="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl">
-                                        <div class="bg-indigo-600 text-white p-2 rounded-lg font-bold text-xs">LOGICA</div>
-                                        <p class="text-xs text-slate-500 leading-relaxed">Si un estudiante marca la opción máxima de riesgo en una pregunta clave, se activa una "bandera". Esto suma puntos adicionales al riesgo global, asegurando que el estudiante reciba atención prioritaria.</p>
-                                    </div>
-                                    <p class="text-sm font-bold text-indigo-900 bg-indigo-50 p-4 rounded-xl italic">"Tres banderas rojas activan automáticamente el nivel de Riesgo Alto, priorizando la vida y permanencia del alumno."</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2. Clasificación Estratégica -->
-                    <div class="space-y-8">
-                        <h3 class="text-2xl font-black text-indigo-950 italic flex items-center gap-4"><span class="h-1.5 w-16 bg-orange-500 rounded-full"></span>Niveles de Clasificación</h3>
-                        
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <!-- Riesgo Alto -->
-                            <div class="bg-white border-t-8 border-red-500 p-8 rounded-[2.5rem] shadow-xl">
-                                <span class="bg-red-100 text-red-600 px-4 py-1 rounded-full font-black text-[10px] uppercase">Score 7.0 - 10.0</span>
-                                <h4 class="text-red-600 font-black text-xl mt-4 mb-2">Intervención Urgente</h4>
-                                <p class="text-xs text-slate-500 italic mb-6">Casos críticos con múltiples factores de vulnerabilidad.</p>
-                                <div class="bg-slate-50 p-4 rounded-2xl border">
-                                    <p class="font-bold text-xs text-slate-700 mb-2">Caso Ejemplo:</p>
-                                    <p class="text-[11px] text-slate-600 leading-relaxed">Estudiante con bajo rendimiento, problemas financieros severos y manifestación explícita de querer abandonar los estudios hoy mismo.</p>
-                                </div>
-                            </div>
-
-                            <!-- Riesgo Medio -->
-                            <div class="bg-white border-t-8 border-orange-500 p-8 rounded-[2.5rem] shadow-xl">
-                                <span class="bg-orange-100 text-orange-600 px-4 py-1 rounded-full font-black text-[10px] uppercase">Score 4.0 - 6.9</span>
-                                <h4 class="text-orange-600 font-black text-xl mt-4 mb-2">Seguimiento Preventivo</h4>
-                                <p class="text-xs text-slate-500 italic mb-6">Vulnerabilidad latente que requiere monitoreo cercano.</p>
-                                <div class="bg-slate-50 p-4 rounded-2xl border">
-                                    <p class="font-bold text-xs text-slate-700 mb-2">Caso Ejemplo:</p>
-                                    <p class="text-[11px] text-slate-600 leading-relaxed">Alumno con buena motivación pero con altos niveles de estrés por carga académica o problemas de transporte constantes.</p>
-                                </div>
-                            </div>
-
-                            <!-- Riesgo Bajo -->
-                            <div class="bg-white border-t-8 border-green-500 p-8 rounded-[2.5rem] shadow-xl">
-                                <span class="bg-green-100 text-green-600 px-4 py-1 rounded-full font-black text-[10px] uppercase">Score 0.0 - 3.9</span>
-                                <h4 class="text-green-600 font-black text-xl mt-4 mb-2">Perfil Estable</h4>
-                                <p class="text-xs text-slate-500 italic mb-6">Factores protectores y resiliencia sólida.</p>
-                                <div class="bg-slate-50 p-4 rounded-2xl border">
-                                    <p class="font-bold text-xs text-slate-700 mb-2">Caso Ejemplo:</p>
-                                    <p class="text-[11px] text-slate-600 leading-relaxed">Estudiante con apoyo familiar, estabilidad económica y un fuerte compromiso con su plan de carrera.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. Salud Institucional -->
-                    <div class="bg-indigo-50 p-12 rounded-[4rem] border border-indigo-100">
-                        <h3 class="text-2xl font-black text-indigo-950 italic flex items-center gap-4 mb-8"><span class="h-1.5 w-16 bg-orange-500 rounded-full"></span>Indicador de Salud Institucional</h3>
-                        <div class="flex flex-col md:flex-row gap-12 items-center">
-                            <div class="flex-1 space-y-6">
-                                <p class="text-slate-600 leading-relaxed">Este valor indica qué tan "protegida" está la población estudiantil. Se obtiene restando el riesgo promedio del total posible (100%).</p>
-                                <div class="bg-white p-8 rounded-3xl shadow-sm border border-indigo-200">
-                                    <h5 class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 text-center">Referencia de Salud</h5>
-                                    <div class="flex justify-between items-end gap-2 px-4">
-                                        <div class="flex flex-col items-center gap-2"><div class="w-8 h-24 bg-red-400 rounded-t-lg"></div><span class="text-[9px] font-bold">Crisis</span></div>
-                                        <div class="flex flex-col items-center gap-2"><div class="w-8 h-32 bg-orange-400 rounded-t-lg"></div><span class="text-[9px] font-bold">Alerta</span></div>
-                                        <div class="flex flex-col items-center gap-2"><div class="w-8 h-48 bg-green-400 rounded-t-lg"></div><span class="text-[9px] font-bold">Óptima</span></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex-1 space-y-6">
-                                <h5 class="font-black text-sm text-indigo-900 uppercase">Ejemplos de Cálculo:</h5>
-                                <div class="space-y-4 text-sm">
-                                    <div class="p-4 bg-white rounded-2xl border">
-                                        <p class="text-slate-600"><strong>Escenario A:</strong> Si el riesgo promedio es 2.0 (Bajo), la Salud Institucional es del <strong>80%</strong>. Indica una gestión exitosa.</p>
-                                    </div>
-                                    <div class="p-4 bg-white rounded-2xl border">
-                                        <p class="text-slate-600"><strong>Escenario B:</strong> Si el riesgo promedio sube a 5.0 (Medio), la Salud baja al <strong>50%</strong>. Indica que la mitad de la población enfrenta desafíos serios.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- CONSOLE -->
-            <section id="section-console" class="hidden tab-content">
-                <div class="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl h-[75vh] flex flex-col border border-slate-800 text-left">
-                    <div class="bg-slate-800 px-8 py-4 flex items-center justify-between font-mono text-slate-500 uppercase text-xs">
-                        <span>heuristics_engine.log</span>
-                        <button onclick="clearConsole()" class="hover:text-white transition-all underline font-bold uppercase text-xs">Limpiar</button>
-                    </div>
-                    <div id="consoleLog" class="p-8 font-mono text-[10px] text-indigo-300 h-full overflow-y-auto custom-scroll leading-loose">
-                        > Motor v7.3 listo.
-                    </div>
-                </div>
-            </section>
-        </main>
+  <!-- SIDEBAR (unchanged markup) -->
+  <aside class="w-full md:w-72 bg-indigo-900 text-white flex flex-col shadow-2xl z-20 text-left">
+    <div class="p-8 text-center border-b border-indigo-800/50">
+      <div class="h-20 w-20 mx-auto mb-4 flex items-center justify-center shadow-xl rotate-3 brand-logo p-1">
+        <img src="/Nuevo ITCPO11.png" alt="ITCPO" class="h-16 w-16 object-contain rounded-lg" />
+      </div>
+      <h2 class="text-[10px] font-black tracking-[0.2em] uppercase text-indigo-300 opacity-80 italic leading-tight text-center">Gestión Estratégica de Permanencia</h2>
     </div>
 
-    <!-- MODAL ESTUDIANTE -->
-    <div id="studentModal" onclick="closeModal(event)">
-        <div class="bg-white w-full max-w-6xl max-h-[96vh] rounded-[4.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row relative text-left" onclick="event.stopPropagation()">
-            <button onclick="closeModal(null)" class="absolute top-10 right-10 text-slate-400 hover:text-slate-800 transition-colors z-20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18" /></svg>
-            </button>
-            <div class="w-full md:w-[450px] bg-slate-50 border-r p-12 pt-16 flex flex-col items-center text-center">
-                <h2 id="modalName" class="text-2xl font-black text-indigo-950 mb-4 leading-tight">Nombre</h2>
-                <div class="w-full space-y-4 mb-10" id="modalDemographics">
-                    <div id="row-faculty" class="hidden">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Facultad</p>
-                        <p id="modalFaculty" class="text-sm font-bold text-indigo-700 italic"></p>
-                    </div>
-                    <div id="row-career" class="hidden">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Carrera</p>
-                        <p id="modalCareer" class="text-sm font-black text-indigo-950 bg-white border border-indigo-100 shadow-sm px-6 py-2 rounded-full inline-block uppercase italic"></p>
-                    </div>
-                    <div id="row-email" class="hidden">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Correo Electrónico</p>
-                        <p id="modalEmail" class="text-sm font-medium text-indigo-600 break-all"></p>
-                    </div>
-                </div>
-                
-                <div class="w-full space-y-6 mt-auto">
-                    <div class="bg-white p-8 rounded-[3rem] border shadow-2xl shadow-indigo-100/50">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Global</p>
-                        <span id="modalRiskScoreDisplay" class="text-5xl font-black text-indigo-900 block mb-2">0.0</span>
-                        <span id="modalRiskBadge" class="inline-block px-12 py-3 rounded-full text-xs font-black uppercase">BAJO</span>
-                    </div>
-                </div>
-            </div>
-            <div class="flex-1 p-20 overflow-y-auto custom-scroll text-left">
-                <div id="aiPlanContainer" class="hidden mb-12 ai-card p-12 rounded-[4.5rem] animate-in fade-in zoom-in duration-300">
-                    <div class="flex items-center gap-5 mb-8 border-b border-indigo-50 pb-6">
-                        <div class="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg"><svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zM7 10a1 1 0 01-1 1H5a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM10 11a1 1 0 100-2 1 1 0 000 2z"></path></svg></div>
-                        <h4 class="text-indigo-950 font-black uppercase text-sm tracking-[0.2em]">Protocolo de Intervención Estratégico</h4>
-                    </div>
-                    <div id="aiPlanContent" class="ai-formatted-text text-indigo-950 text-sm leading-relaxed"></div>
-                </div>
+    <nav class="flex-1 px-4 py-8 space-y-3 relative">
+      <!-- Herramientas moved here (top of sidebar) -->
+      <div class="mb-3">
+        <button onclick="toggleTools()" id="sidebar-tools-btn" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all text-sm text-left text-orange-400">
+          <span class="font-bold">Herramientas</span>
+        </button>
 
-                <h3 class="text-sm font-black text-slate-800 uppercase tracking-[0.3em] mb-12 border-b pb-4 italic text-indigo-900">Ficha Técnica de Vulnerabilidad</h3>
-                <div class="h-[450px] mb-16"><canvas id="modalRadarChart"></canvas></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="modalIndicatorsDetails"></div>
+        <!-- moved dropdown: positioned to the right of the sidebar button -->
+        <div id="toolsDropdown" class="bg-white text-slate-800 rounded-2xl p-3 border border-slate-100">
+          <label class="flex items-center gap-4 px-4 py-3 hover:bg-orange-50 rounded-xl cursor-pointer transition-colors group text-sm font-bold">
+            <div class="p-2 bg-orange-100 text-orange-600 rounded-lg">📥</div>
+            <span>Importar Encuesta (.xlsx)</span>
+            <input type="file" id="fileInput" class="hidden" accept=".xlsx,.csv" />
+          </label>
+
+          <div class="mt-2 px-3 py-3 bg-slate-50 rounded-xl border">
+            <div class="text-xs font-black uppercase text-slate-600 mb-2">Pesos por Variable (en %)</div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-36 text-xs text-slate-600">Académico</label>
+                <input id="weight_academic" type="number" min="0" max="100" value="20" class="w-20 px-2 py-1 rounded text-xs border text-right" />%
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-36 text-xs text-slate-600">Permanencia</label>
+                <input id="weight_permanence" type="number" min="0" max="100" value="20" class="w-20 px-2 py-1 rounded text-xs border text-right" />%
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-36 text-xs text-slate-600">Salud Mental</label>
+                <input id="weight_wellbeing" type="number" min="0" max="100" value="20" class="w-20 px-2 py-1 rounded text-xs border text-right" />%
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-36 text-xs text-slate-600">Económico</label>
+                <input id="weight_socioeconomic" type="number" min="0" max="100" value="20" class="w-20 px-2 py-1 rounded text-xs border text-right" />%
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-36 text-xs text-slate-600">Entorno</label>
+                <input id="weight_health_family" type="number" min="0" max="100" value="20" class="w-20 px-2 py-1 rounded text-xs border text-right" />%
+              </div>
+              <div class="flex items-center justify-between mt-2">
+                <div class="text-[11px] text-slate-500">Total:</div>
+                <div id="weightsSum" class="text-[11px] font-black">100%</div>
+              </div>
+              <div class="col-span-2 flex gap-2 mt-2">
+                <button id="applyWeightsBtn" class="flex-1 bg-orange-500 text-white px-3 py-2 rounded text-xs font-black">Aplicar</button>
+                <button id="resetWeightsBtn" class="flex-1 bg-white border px-3 py-2 rounded text-xs font-black">Reset</button>
+              </div>
             </div>
+          </div>
+
+          <!-- Umbrales de clasificación -->
+          <div class="mt-3 px-3 py-3 bg-slate-50 rounded-xl border">
+            <div class="text-xs font-black uppercase text-slate-600 mb-2">Umbrales de Riesgo (escala 0.00 - 10.00)</div>
+            <div class="grid grid-cols-1 gap-2 text-sm">
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-44 text-xs text-slate-600">Umbral mínimo para Riesgo Medio</label>
+                <input id="threshold_medium_min" type="number" step="0.01" min="0" max="10" value="4.00" class="w-20 px-2 py-1 rounded text-xs border text-right" />
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-44 text-xs text-slate-600">Umbral máximo para Riesgo Medio</label>
+                <input id="threshold_medium_max" type="number" step="0.01" min="0" max="10" value="6.90" class="w-20 px-2 py-1 rounded text-xs border text-right" />
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label class="w-44 text-xs text-slate-600">Redondeo al evaluar</label>
+                <div class="flex items-center gap-2">
+                  <label class="text-xs"><input type="radio" name="threshold_round" value="up" id="round_up" checked/> Arriba (ceil)</label>
+                  <label class="text-xs ml-2"><input type="radio" name="threshold_round" value="down" id="round_down"/> Abajo (floor)</label>
+                </div>
+              </div>
+              <div class="text-[11px] text-slate-500">Las comparaciones usan solo '>' y '&lt;' (exclusivas). Ajustar ambos valores en 0.01.</div>
+              <div class="flex gap-2 mt-2">
+                <button id="applyThresholdsBtn" class="flex-1 bg-indigo-600 text-white px-3 py-2 rounded text-xs font-black">Aplicar Umbrales</button>
+                <button id="resetThresholdsBtn" class="flex-1 bg-white border px-3 py-2 rounded text-xs font-black">Reset</button>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="exportToExcel()" class="w-full mt-3 flex items-center gap-4 px-4 py-3 hover:bg-green-50 rounded-xl transition-colors group text-sm font-bold">
+            <div class="p-2 bg-green-100 text-green-600 rounded-lg">📤</div>
+            <span>Exportar Resultados</span>
+          </button>
         </div>
-    </div>
+      </div>
 
-    <!-- MODAL PESOS -->
-    <div id="weightsModal">
-        <div class="bg-white w-full max-w-2xl rounded-[3.5rem] shadow-2xl overflow-hidden p-12 relative text-left" onclick="event.stopPropagation()">
-            <h2 class="text-2xl font-black text-indigo-950 mb-2 uppercase italic">Configuración Estratégica</h2>
-            <p class="text-xs text-slate-500 mb-8 font-bold">Ajuste el impacto porcentual de cada dimensión. La suma debe ser 100%.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-                <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-2xl border">
-                    <span class="text-[10px] font-black text-indigo-900 uppercase">Permanencia</span>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="w-permanence" value="20" class="w-14 text-center font-black bg-white border rounded-lg p-2 text-indigo-600 outline-none text-xs">
-                        <span class="font-bold text-slate-400 text-xs">%</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-2xl border">
-                    <span class="text-[10px] font-black text-indigo-900 uppercase">Salud Mental</span>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="w-wellbeing" value="20" class="w-14 text-center font-black bg-white border rounded-lg p-2 text-indigo-600 outline-none text-xs">
-                        <span class="font-bold text-slate-400 text-xs">%</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-2xl border">
-                    <span class="text-[10px] font-black text-indigo-900 uppercase">Economía</span>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="w-socioeconomic" value="20" class="w-14 text-center font-black bg-white border rounded-lg p-2 text-indigo-600 outline-none text-xs">
-                        <span class="font-bold text-slate-400 text-xs">%</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-2xl border">
-                    <span class="text-[10px] font-black text-indigo-900 uppercase">Académico</span>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="w-academic" value="20" class="w-14 text-center font-black bg-white border rounded-lg p-2 text-indigo-600 outline-none text-xs">
-                        <span class="font-bold text-slate-400 text-xs">%</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-2xl border md:col-span-2">
-                    <span class="text-[10px] font-black text-indigo-900 uppercase">Entorno</span>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="w-health_family" value="20" class="w-14 text-center font-black bg-white border rounded-lg p-2 text-indigo-600 outline-none text-xs">
-                        <span class="font-bold text-slate-400 text-xs">%</span>
-                    </div>
-                </div>
+      <button onclick="showSection('dashboard')" id="btn-dashboard" class="sidebar-item active w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left">
+        Dashboard Global
+      </button>
+      <button onclick="showSection('database')" id="btn-database" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left">
+        Estudiantes
+      </button>
+      <button onclick="showSection('help')" id="btn-help" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left text-white">
+        Ayuda y Soporte
+      </button>
+      <button onclick="showSection('console')" id="btn-console" class="sidebar-item w-full flex items-center gap-4 px-5 py-4 rounded-xl hover:bg-indigo-800/50 transition-all font-bold text-sm text-left">
+        Algoritmos y Sucesos
+      </button>
+    </nav>
+
+    <div class="p-8 border-t border-indigo-800/30">
+      <div class="bg-indigo-950/50 rounded-2xl p-5 text-center border border-indigo-700/30 shadow-inner">
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest leading-relaxed italic">Carlos Alfredo Castillo Flores<br>ITCPO - 2026 | Versión 7.3</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA (kept markup; script will wire functionality) -->
+  <div class="flex-1 flex flex-col h-screen overflow-hidden text-left">
+    <header class="bg-orange-500 text-white shadow-xl p-5 flex justify-between items-center z-10">
+      <div class="flex items-center gap-4 flex-col md:flex-row">
+        <h1 class="text-xl font-black uppercase tracking-tighter italic text-white drop-shadow-sm">
+          <span class="font-black">RISK INTELLIGENCE</span>
+        </h1>
+      </div>
+      <div class="relative flex items-center gap-4">
+        <div id="powerBadge" class="text-xs font-bold text-white opacity-90 mt-1 animate-power">Powered by ITCPO</div>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-8 custom-scroll bg-slate-50/50">
+      <!-- Dashboard section (simplified) -->
+      <section id="section-dashboard" class="tab-content">
+        <div id="welcomeReel" class="bg-white p-16 rounded-[3rem] shadow-2xl border max-w-4xl mx-auto mt-16 relative overflow-hidden h-[450px] text-center">
+          <div id="slidesContainer">
+            <div class="reel-slide active">
+              <div class="h-24 w-24 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform -rotate-3">
+                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+              </div>
+              <h2 class="text-4xl font-black text-slate-800 mb-6 tracking-tight uppercase italic">Bienvenido a la Inteligencia ITCPO</h2>
+              <p class="text-slate-500 text-xl max-w-2xl mx-auto">Transformamos encuestas masivas en <strong>indicadores de riesgo accionables</strong>.</p>
             </div>
-            <div class="flex items-center justify-between mb-8 px-2 border-t pt-6">
-                <span class="text-xs font-black uppercase text-slate-400">Suma total requerida (100%):</span>
-                <span id="weight-total-display" class="text-xl font-black text-indigo-600">100%</span>
-            </div>
-            <div class="flex gap-4">
-                <button onclick="closeWeightsModal()" class="flex-1 py-4 text-xs font-black uppercase text-slate-400 hover:text-slate-600 transition-colors">Cancelar</button>
-                <button onclick="saveWeights()" class="flex-2 bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all">Aplicar Cambios</button>
-            </div>
+          </div>
         </div>
+
+        <div id="statsContainer" class="hidden space-y-8 mt-12">
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-indigo-600">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Población Total</p>
+              <h3 id="kpiTotal" class="text-4xl font-black">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-red-500">
+              <p class="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2">Riesgo Alto</p>
+              <h3 id="kpiHigh" class="text-4xl font-black text-red-600">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-orange-500">
+              <p class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2">Riesgo Medio</p>
+              <h3 id="kpiMedium" class="text-4xl font-black text-orange-600">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-green-500">
+              <p class="text-[10px] font-black text-green-500 uppercase tracking-widest mb-2">Riesgo Bajo</p>
+              <h3 id="kpiLow" class="text-4xl font-black text-green-600">0</h3>
+            </div>
+
+            <!-- Nuevo indicador: Riesgo promedio (0-10) -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-slate-400">
+              <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Riesgo promedio</p>
+              <h3 id="kpiAvgRisk" class="text-4xl font-black cursor-pointer" onclick="openAvgRiskModal()">0.0</h3>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-l-8 border-l-indigo-400">
+              <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Salud Institucional</p>
+              <h3 id="kpiAvgScore" class="text-4xl font-black">0%</h3>
+            </div>
+          </div>
+
+
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white p-10 rounded-3xl shadow-sm border"><canvas id="chartDistribution"></canvas></div>
+            <div class="bg-white p-10 rounded-3xl shadow-sm border"><canvas id="chartCategories"></canvas></div>
+          </div>
+
+          <!-- Gráfico por Facultad: barras horizontales con totales y porcentajes -->
+          <div class="mt-8 bg-white p-6 rounded-3xl shadow-sm border">
+            <h4 class="font-black text-slate-800 mb-4">Distribución por Facultad / Centro</h4>
+            <div class="text-sm text-slate-500 mb-3">Totales y porcentaje relativo sobre la población cargada</div>
+            <div class="h-64"><canvas id="chartByFaculty"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Database / students -->
+      <section id="section-database" class="hidden tab-content">
+        <div class="bg-white rounded-3xl shadow-xl border overflow-hidden">
+          <div class="p-8 bg-slate-50/50 border-b flex flex-col md:flex-row justify-between items-center gap-6">
+            <h2 class="text-2xl font-black text-indigo-950 uppercase italic tracking-tighter">Auditoría Individual <span id="studentCount" class="text-orange-500 ml-3 text-xl font-black"></span></h2>
+            <div class="flex gap-4 items-center flex-wrap">
+              <div class="flex gap-3 items-center flex-wrap">
+                <select id="filterFacultad" class="bg-white border rounded-2xl px-3 py-2 text-xs font-black shadow-sm outline-none w-44 md:w-52">
+                  <option value="all">Todas las Facultades</option>
+                </select>
+                <select id="filterCarrera" class="bg-white border rounded-2xl px-3 py-2 text-xs font-black shadow-sm outline-none w-44 md:w-52">
+                  <option value="all">Todas las Carreras</option>
+                </select>
+                <select id="filterRiesgo" class="bg-white border rounded-2xl px-4 py-2 text-xs font-black shadow-sm outline-none">
+                  <option value="all">Cualquier Riesgo</option>
+                  <option value="Alto">Riesgo Alto</option>
+                  <option value="Medio">Riesgo Medio</option>
+                  <option value="Bajo">Riesgo Bajo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-[65vh] custom-scroll">
+            <table class="w-full text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100 z-0 shadow-sm border-b">
+                <tr class="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em]">
+                  <th class="p-6">Nombre del Alumno</th>
+                  <th class="p-6">Académico</th>
+                  <th class="p-6">Permanencia</th>
+                  <th class="p-6">Salud Mental</th>
+                  <th class="p-6">Económico</th>
+                  <th class="p-6">Entorno</th>
+                  <th class="p-6 text-center">Score /10</th>
+                  <th class="p-6 text-center">Riesgo</th>
+                </tr>
+              </thead>
+              <tbody id="studentTableBody" class="text-slate-700 divide-y cursor-pointer">
+                <tr><td colspan="8" class="p-32 text-center text-slate-300 font-bold italic">Cargue datos XLSX para iniciar.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Help (redesigned) -->
+      <section id="section-help" class="hidden tab-content">
+        <div class="max-w-6xl mx-auto pb-12">
+          <div class="relative bg-white rounded-3xl shadow-2xl overflow-hidden border">
+            <!-- Decorative side panel -->
+            <div class="hidden md:block absolute inset-y-0 left-0 w-1/3 bg-gradient-to-b from-orange-100 via-orange-50 to-white">
+              <svg class="absolute -left-10 -top-10 opacity-20" width="220" height="220" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
+                <circle cx="60" cy="60" r="80" fill="url(#g1)"></circle>
+              </svg>
+              <div class="h-full flex items-center justify-center p-8">
+                <div class="text-center">
+                  <div class="inline-block bg-white/80 rounded-2xl p-4 shadow-md mb-4">
+                    <svg class="w-12 h-12 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3"/></svg>
+                  </div>
+                  <h3 class="text-orange-600 font-black uppercase tracking-wide">Soporte & Guía</h3>
+                  <p class="text-sm text-slate-500 mt-2 max-w-xs">Instrucciones claras para cargar, interpretar y exportar resultados.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main content -->
+            <div class="md:pl-1/3 p-8 md:pl-[34%]">
+              <div class="flex items-start justify-between gap-6">
+                <div>
+                  <h2 class="text-2xl font-extrabold text-slate-800 uppercase tracking-tight">Ayuda y Soporte</h2>
+                  <p class="text-sm text-slate-600 mt-2 max-w-2xl">Convierta encuestas en indicadores accionables; aquí encuentra detalles sobre cálculo, ejemplos y opciones operativas para garantizar resultados confiables.</p>
+                </div>
+                <div class="hidden md:flex flex-col items-end gap-2">
+                  <span class="text-xs uppercase font-black text-slate-400">Versión</span>
+                  <div class="bg-indigo-50 text-indigo-700 font-black px-3 py-1 rounded-full">7.3</div>
+                </div>
+              </div>
+
+              <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="col-span-2 space-y-4">
+                  <div class="bg-gradient-to-r from-white to-slate-50 p-6 rounded-2xl border shadow-sm">
+                    <h4 class="font-bold text-indigo-900">Introducción breve</h4>
+                    <p class="text-sm text-slate-600 mt-2">La herramienta procesa respuestas tipo Likert y numéricas para generar un índice compuesto (0–10) que ayuda a priorizar intervenciones por estudiante y por facultad.</p>
+                  </div>
+
+                  <details class="bg-white p-6 rounded-2xl border shadow-sm open:shadow-md">
+                    <summary class="font-bold text-slate-800 cursor-pointer">Cómo se realizan los cálculos (detalle y ejemplo)</summary>
+                    <div class="mt-4 text-sm text-slate-600 space-y-3">
+                      <ol class="list-decimal pl-5 space-y-2">
+                        <li>Clasificación de preguntas por dominio usando KEYWORDS; columnas con NEGATIVES mantienen dirección de riesgo.</li>
+                        <li>Mapeo Likert -> 1-5 y normalización a escala 0–5 (neutral ≈2.5). Valores numéricos válidos también se usan.</li>
+                        <li>Si la pregunta es positiva se invierte la dirección de riesgo en la escala 0–5; preguntas negativas mantienen dirección.</li>
+                        <li>Promedio por dominio (0–5). Si no hay ítems se usa punto medio 2.5.</li>
+                        <li>Banderas rojas (redFlags) detectan señales críticas y suman +0.3 cada una al puntaje en 0–5.</li>
+                        <li>Puntaje final = suma ponderada de dominios + ajuste banderas (clamp 0–5) → multiplicar por 2 → escala 0–10.</li>
+                      </ol>
+                      <div class="bg-slate-50 p-3 rounded-md border text-xs">
+                        Ejemplo: dominios = {A:4.0(15%), P:3.5(35%), S:2.0(20%), E:3.0(20%), H:2.5(10%)} → base≈3.14 + 0.3(redFlag)=3.44 → 6.9/10 → Nivel Medio.
+                      </div>
+                    </div>
+                  </details>
+
+                  <details class="bg-white p-6 rounded-2xl border shadow-sm open:shadow-md">
+                    <summary class="font-bold text-slate-800 cursor-pointer">Interpretación y Umbrales</summary>
+                    <div class="mt-4 text-sm text-slate-600 space-y-2">
+                      <p>Escala 0–10:</p>
+                      <ul class="list-disc pl-5">
+                        <li>Bajo: &lt; 4.0</li>
+                        <li>Medio: 4.0 – 6.9</li>
+                        <li>Alto: ≥ 7.0 (o ≥2 redFlags)</li>
+                      </ul>
+                      <p class="text-xs text-slate-500 mt-2">Nota: umbrales ajustados para priorizar casos críticos; las banderas rojas elevan el puntaje para asegurar visibilidad.</p>
+                    </div>
+                  </details>
+
+                  <details class="bg-white p-6 rounded-2xl border shadow-sm open:shadow-md">
+                    <summary class="font-bold text-slate-800 cursor-pointer">Ejemplo detallado de transformación Likert → riesgo</summary>
+                    <div class="mt-4 text-sm text-slate-600 space-y-2">
+                      <p>Mapeo: "Totalmente de acuerdo" = 5 → normalizado = 5.0 en 0–5; si la pregunta es POSITIVA se invierte a (5 - 5.0) = 0 (bajo riesgo).</p>
+                      <p>Si la pregunta es NEGATIVA, "Totalmente de acuerdo" = 5 → normalizado = 5.0 → riesgo = 5.0 (alto).</p>
+                    </div>
+                  </details>
+
+                  <details class="bg-white p-6 rounded-2xl border shadow-sm open:shadow-md">
+                    <summary class="font-bold text-slate-800 cursor-pointer">Cómo se calcula la Salud Institucional</summary>
+                    <div class="mt-4 text-sm text-slate-600 space-y-3">
+                      <p>La "Salud Institucional" mostrada en el dashboard es un resumen agregado del nivel de riesgo promedio de toda la población en escala 0–100% derivado del promedio de puntajes globales (0–10).</p>
+                      <ol class="list-decimal pl-5 space-y-2">
+                        <li>Se calcula el puntaje por estudiante en escala 0–10 (ver proceso de dominios, pesos y banderas).</li>
+                        <li>Se obtiene el promedio aritmético de esos puntajes (ej: suma de todos los score10 / N).</li>
+                        <li>Ese promedio (0–10) se multiplica por 10 para convertirlo a porcentaje (0–100%).</li>
+                        <li>El KPI "Salud Institucional" muestra ese porcentaje redondeado y sirve para comparar periodos o subgrupos (facultad/carrera).</li>
+                      </ol>
+                      <div class="bg-slate-50 p-3 rounded-md border text-xs">
+                        Ejemplo: Si la muestra tiene 5 estudiantes con scores: 8.0, 6.5, 5.0, 7.5, 4.0 → promedio = (8+6.5+5+7.5+4)/5 = 6.2 → Salud Institucional = 6.2*10 = 62%. En el dashboard aparecerá "62%".
+                      </div>
+                      <p class="text-xs text-slate-500 mt-2">Nota: al aplicar filtros (facultad/carrera) el KPI se recalcula con la subpoblación filtrada; si hay pocos registros, interpretar con precaución.</p>
+                    </div>
+                  </details>
+                </div>
+
+                <aside class="space-y-4">
+                  <div class="p-4 rounded-2xl bg-orange-50 border-l-4 border-orange-200">
+                    <h5 class="font-bold text-orange-600">Opciones Rápidas</h5>
+                    <ul class="text-sm text-slate-600 mt-2 list-disc pl-5 space-y-1">
+                      <li>Importar .xlsx: primera hoja, mapeo automático.</li>
+                      <li>Filtrar por Facultad y Riesgo en la tabla.</li>
+                      <li>Exportar Resultados: XLSX con resumen por estudiante.</li>
+                    </ul>
+                  </div>
+
+                  <div class="p-4 rounded-2xl bg-indigo-50 border-l-4 border-indigo-200">
+                    <h5 class="font-bold text-indigo-700">Consejos de Calidad</h5>
+                    <ul class="text-sm text-slate-600 mt-2 list-disc pl-5 space-y-1">
+                      <li>Revise encabezados: incluir palabras clave de KEYWORDS mejora el mapeo.</li>
+                      <li>Evite celdas vacías: las preguntas ausentes se tratan como neutras (2.5).</li>
+                      <li>Use respuestas consistentes tipo Likert para mejores promedios.</li>
+                    </ul>
+                  </div>
+
+                  <div class="p-4 rounded-2xl bg-white border shadow-sm text-sm">
+                    <div class="font-bold text-slate-700">Soporte</div>
+                    <div class="text-xs text-slate-500 mt-2">Si necesitas ayuda específica, copia el nombre del archivo y los encabezados relevantes al reportar un problema.</div>
+                  </div>
+                </aside>
+              </div>
+
+              <div class="mt-8 text-xs text-slate-400 italic">© 2026 ITCPO. Todos los derechos reservados.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Console -->
+      <section id="section-console" class="hidden tab-content">
+        <div class="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl h-[75vh] flex flex-col border border-slate-800">
+          <div class="bg-slate-800 px-8 py-4 font-mono text-slate-500 uppercase text-xs flex justify-between">
+            <span>Registro – Motor de Heurísticas ITCPO</span>
+            <button onclick="clearConsole()" class="underline font-bold uppercase text-xs">Limpiar</button>
+          </div>
+          <div id="consoleLog" class="p-8 font-mono text-xs text-indigo-300 h-full overflow-y-auto custom-scroll">> Motor ITCPO v7.3 cargado. Motor IA configurado para análisis cognitivo.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Avg Risk details modal (floating overlay) -->
+  <div id="avgRiskModal" class="hidden" onclick="closeAvgRiskModal(event)">
+    <div class="avg-modal-card" onclick="event.stopPropagation()">
+      <button onclick="closeAvgRiskModal(null)" class="avg-modal-close">✖</button>
+      <h3 class="text-xl font-black text-slate-800 mb-3">Detalle del cálculo — Riesgo promedio (población)</h3>
+      <div id="avgRiskDetails" class="avg-modal-body bg-slate-50 p-4 rounded border"></div>
+      <div class="mt-4 text-right">
+        <button onclick="closeAvgRiskModal(null)" class="bg-indigo-600 text-white px-4 py-2 rounded">Cerrar</button>
+      </div>
     </div>
+  </div>
 
-    <script>
-        const apiKey = ""; 
-        let rawImportedData = null; 
-        let studentsData = [];
-        let categoryMap = {};
-        let charts = {};
-        let modalChartInstance = null;
-        let selectedStudent = null;
+  <!-- Student modal (kept) -->
+  <div id="studentModal" onclick="closeModal(event)">
+    <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row relative" onclick="event.stopPropagation()">
+      <button onclick="closeModal(null)" class="absolute top-8 right-8 text-slate-400 hover:text-slate-800 z-20">
+        ✖
+      </button>
+      <div class="w-full md:w-72 bg-slate-50 border-r p-10 flex flex-col items-center text-center">
+        <div class="h-20 w-20 flex items-center justify-center p-1" id="modalLogoBox">
+          <img src="/Nuevo ITCPO11.png" alt="ITCPO" class="h-14 w-14 object-contain rounded-md" />
+        </div>
+        <h2 id="modalName" class="text-2xl font-black text-indigo-950 mt-6 mb-1 leading-tight">Nombre</h2>
+        <p id="modalFaculty" class="text-[11px] font-black text-indigo-700 uppercase italic"></p>
+        <p id="modalCareer" class="text-[10px] font-bold text-slate-500 uppercase italic"></p>
+        <p id="modalEmail" class="text-[9px] font-medium text-slate-400 break-all"></p>
+        <p id="modalCarnet" class="text-[9px] font-black text-orange-500 tracking-widest uppercase"></p>
 
-        let STRATEGIC_WEIGHTS = {
-            permanence: 0.20,
-            wellbeing: 0.20,
-            socioeconomic: 0.20,
-            academic: 0.20,
-            health_family: 0.20
+        <div class="w-full mt-6 space-y-4">
+          <div class="bg-white p-5 rounded-2xl border shadow-sm text-center">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Global</p>
+            <span id="modalRiskScoreDisplay" class="text-xl font-black text-indigo-900 block mb-2">0.0</span>
+            <span id="modalRiskBadge" class="inline-block px-5 py-2 rounded-full text-sm font-black uppercase">BAJO</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 p-8 overflow-y-auto custom-scroll">
+
+        <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 border-b pb-3 italic text-indigo-900">Perfil de Vulnerabilidad</h3>
+        <div class="h-96 mb-6"><canvas id="modalRadarChart"></canvas></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="modalIndicatorsDetails"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Provide immediate non-module fallbacks for critical handlers to avoid ReferenceError
+       if the module hasn't finished loading when a user clicks an inline onclick. -->
+  <script>
+    // Minimal safe fallbacks that defer to the module implementations when available.
+    // These prevent "toggleTools is not defined" if a user clicks before main.js runs.
+    (function() {
+      // Named placeholder generator: each placeholder will try to call the real function
+      // if it has been assigned later; the placeholder marks itself to avoid infinite recursion.
+      function makePlaceholder(name) {
+        const placeholder = function placeholderFunction(...args) {
+          // If a real function replaced the placeholder, call it.
+          const real = window[name];
+          if (typeof real === 'function' && !real.__isPlaceholder) {
+            try { return real.apply(this, args); } catch (e) { /* swallow to avoid UI errors */ }
+          }
+          // Otherwise, no-op safely.
+          return null;
         };
+        // mark so we can detect placeholders vs real implementations
+        placeholder.__isPlaceholder = true;
+        return placeholder;
+      }
 
-        const CONFIG = {
-            KEYWORDS: {
-                academic: ["académico", "estudio", "examen", "asignatura", "preparado", "promedio"],
-                permanence: ["carrera", "abandonar", "cambiar", "continuar", "motivado", "retirarme"],
-                wellbeing: ["abrumado", "ansiedad", "estrés", "concentrar", "interés"],
-                socioeconomic: ["económica", "trabaj", "transporte", "internet", "gastos", "financiero", "dinero"],
-                health_family: ["familia", "salud", "casa", "apoyo", "cuidado"]
-            },
-            NEGATIVES: ["abandonar", "cambiar", "abrumado", "ansiedad", "estrés", "dejar", "problema", "dificult", "conflicto", "desanimado", "perdido", "retirarme", "cuesta", "preocupado"],
-            LIKERT: { "Totalmente en desacuerdo": 1, "En desacuerdo": 2, "Neutral": 3, "De acuerdo": 4, "Totalmente de acuerdo": 5, "Nunca": 1, "Rara vez": 2, "Ocasionalmente": 3, "Frecuentemente": 4, "Muy frecuentemente (siempre)": 5, "Sí": 1, "No": 0 }
-        };
-
-        Chart.register(ChartDataLabels);
-
-        function closeModal(e) { 
-            const modal = document.getElementById('studentModal');
-            if (!e || e.target === modal || e === null) { if(modal) modal.classList.remove('show'); }
+      const handlers = ['toggleTools', 'showSection', 'openStudentModal', 'closeModal', 'exportToExcel', 'clearConsole', 'openAvgRiskModal', 'closeAvgRiskModal'];
+      handlers.forEach(name => {
+        if (!window[name]) {
+          window[name] = makePlaceholder(name);
         }
+      });
+    })();
+  </script>
 
-        function openWeightsModal() {
-            document.getElementById('toolsDropdown').classList.remove('show');
-            document.getElementById('weightsModal').classList.add('show');
-            updateWeightsVisuals();
-        }
-
-        function closeWeightsModal() {
-            document.getElementById('weightsModal').classList.remove('show');
-        }
-
-        function updateWeightsVisuals() {
-            const ids = ['permanence', 'wellbeing', 'socioeconomic', 'academic', 'health_family'];
-            let total = 0;
-            ids.forEach(id => {
-                total += parseFloat(document.getElementById(`w-${id}`).value) || 0;
-            });
-            const display = document.getElementById('weight-total-display');
-            display.innerText = `${total}%`;
-            display.className = total === 100 ? "text-xl font-black text-green-600" : "text-xl font-black text-red-500";
-        }
-
-        ['permanence', 'wellbeing', 'socioeconomic', 'academic', 'health_family'].forEach(id => {
-            const el = document.getElementById(`w-${id}`);
-            if(el) el.addEventListener('input', updateWeightsVisuals);
-        });
-
-        function saveWeights() {
-            const p = parseFloat(document.getElementById('w-permanence').value) || 0;
-            const w = parseFloat(document.getElementById('w-wellbeing').value) || 0;
-            const s = parseFloat(document.getElementById('w-socioeconomic').value) || 0;
-            const a = parseFloat(document.getElementById('w-academic').value) || 0;
-            const h = parseFloat(document.getElementById('w-health_family').value) || 0;
-            
-            if (p + w + s + a + h !== 100) {
-                sysLog("Error: El total debe sumar 100%", "error");
-                return;
-            }
-            STRATEGIC_WEIGHTS = { permanence: p/100, wellbeing: w/100, socioeconomic: s/100, academic: a/100, health_family: h/100 };
-            sysLog("Pesos estratégicos actualizados.", "success");
-            closeWeightsModal();
-            if (rawImportedData) processFile(rawImportedData);
-        }
-
-        function analyzeHeaders(keys) {
-            categoryMap = { academic: [], permanence: [], wellbeing: [], socioeconomic: [], health_family: [] };
-            sysLog("Analizando mapeo de columnas...", "info");
-            keys.forEach((key) => {
-                const low = key.toLowerCase();
-                for (let cat in CONFIG.KEYWORDS) {
-                    if (CONFIG.KEYWORDS[cat].some(kw => low.includes(kw))) {
-                        const isNeg = CONFIG.NEGATIVES.some(neg => low.includes(neg));
-                        categoryMap[cat].push({ key: key, isNeg: isNeg });
-                        break;
-                    }
-                }
-            });
-        }
-
-        function formatAiResponse(text) { 
-            if(!text) return ""; 
-            return text
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/^\* (.*$)/gm, '<li>$1</li>')
-                .replace(/\n/g, '<br>'); 
-        }
-
-        function sysLog(msg, type = 'info') { 
-            const c = document.getElementById('consoleLog'); 
-            if(c) { 
-                const colorClass = type === 'success' ? 'text-green-400' : (type === 'error' ? 'text-red-400' : 'text-indigo-300');
-                c.innerHTML += `<div class="py-1 ${colorClass}">> ${msg}</div>`; 
-                c.scrollTop = c.scrollHeight; 
-            } 
-        }
-
-        async function generateGlobalInsights() {
-            if (!studentsData.length) return;
-            const btnT = document.getElementById('aiInsightBtnText');
-            const loading = document.getElementById('aiInsightLoading');
-            btnT.textContent = "Procesando..."; 
-            loading.classList.remove('hidden');
-            
-            const s = { 
-                t: studentsData.length, 
-                a: studentsData.filter(x => x.nivel === 'Alto').length, 
-                m: studentsData.filter(x => x.nivel === 'Medio').length, 
-                b: studentsData.filter(x => x.nivel === 'Bajo').length 
-            };
-            
-            const q = `Analiza estadísticas institucionales: Total Estudiantes:${s.t}, Riesgo Alto:${s.a}, Riesgo Medio:${s.m}, Riesgo Bajo:${s.b}. Genera un diagnóstico ejecutivo breve y puntos críticos. Usa ### para títulos y negritas para énfasis.`;
-            
-            try {
-                const result = await callGemini(q, "Eres un consultor experto en permanencia estudiantil.");
-                document.getElementById('aiGlobalContent').innerHTML = formatAiResponse(result);
-                document.getElementById('aiGlobalContainer').classList.remove('hidden');
-                document.getElementById('aiGlobalContainer').scrollIntoView({ behavior: 'smooth' });
-            } catch (e) { 
-                sysLog(e.message, "error"); 
-            } finally { 
-                btnT.textContent = "✨ Obtener Análisis Estratégico IA"; 
-                loading.classList.add('hidden'); 
-            }
-        }
-
-         function updateCareerOptions() {
-            const facF = document.getElementById('filterFacultad').value;
-            const filterCar = document.getElementById('filterCarrera');
-            
-            const filteredData = (facF === 'all') ? studentsData : studentsData.filter(s => s.facultad === facF);
-            const cList = [...new Set(filteredData.map(s => s.carrera))].filter(c => c).sort();
-            
-            filterCar.innerHTML = '<option value="all">Todas las Carreras</option>';
-            cList.forEach(c => { filterCar.innerHTML += `<option value="${c}">${c}</option>`; });
-            filterCar.value = 'all';
-            renderTable();
-        }
-
-        function processFile(raw_data) {
-            if (!raw_data || raw_data.length === 0) return;
-            rawImportedData = raw_data;
-            const headers = Object.keys(raw_data[0]);
-            const cleanKeys = headers.map(k => k.trim());
-            const data = raw_data.map(row => { 
-                let r = {}; 
-                headers.forEach((k, i) => { r[cleanKeys[i]] = row[k]; }); 
-                return r; 
-            });
-            
-            analyzeHeaders(cleanKeys);
-
-            const fk = (s) => cleanKeys.find(k => k.toLowerCase().includes(s.toLowerCase()));
-            const fkExact = (s) => cleanKeys.find(k => k.toLowerCase() === s.toLowerCase());
-
-            const emailKey = fk("correo electrónico") || fk("email");
-            const facKey = fk("facultad");
-            const nameKey = fk("nombre");
-            const carnetKey = fk("carnet");
-            const carreraKey = fkExact("carrera") || fk("carrera");
-
-            // Población de Filtro de Facultad
-            const fList = [...new Set(data.map(d => d[facKey]))].filter(f => f).sort();
-            const filterFac = document.getElementById('filterFacultad');
-            filterFac.innerHTML = '<option value="all">Todas las Facultades</option>';
-            fList.forEach(f => { filterFac.innerHTML += `<option value="${f}">${f}</option>`; });
-
-            studentsData = data.map((row) => {
-                const res = {};
-                let flags = 0;
-                for (let cat in categoryMap) {
-                    let sum = 0, count = 0;
-                    categoryMap[cat].forEach(col => {
-                        let raw = row[col.key]; if(!raw) return;
-                        let val = 3;
-                        let nm = raw.toString().match(/\d+/);
-                        if (nm) val = parseInt(nm[0]);
-                        else val = CONFIG.LIKERT[raw] || 3;
-                        
-                        let prob = col.isNeg ? (val - 1) / 4 : (5 - val) / 4;
-                        prob = Math.max(0, Math.min(1, prob));
-                        
-                        if (prob >= 0.75 && (cat === 'permanence' || col.key.toLowerCase().includes('abandonar'))) flags++;
-                        sum += prob; count++;
-                    });
-                    res[cat] = count > 0 ? (sum / count) : 0; 
-                }
-
-                let weightedProb = (res.permanence * STRATEGIC_WEIGHTS.permanence) + 
-                                   (res.wellbeing * STRATEGIC_WEIGHTS.wellbeing) + 
-                                   (res.socioeconomic * STRATEGIC_WEIGHTS.socioeconomic) + 
-                                   (res.academic * STRATEGIC_WEIGHTS.academic) + 
-                                   (res.health_family * STRATEGIC_WEIGHTS.health_family);
-                
-                let score10 = (weightedProb * 10) + (flags * 0.6);
-                score10 = Math.max(0, Math.min(10, score10));
-                let nivel = score10 >= 7.0 || flags >= 3 ? "Alto" : (score10 >= 4.0 ? "Medio" : "Bajo");
-
-                return { 
-                    email: row[emailKey] || "", 
-                    nombre: row[nameKey] || "Estudiante", 
-                    facultad: (row[facKey] || "S/D").toString(), 
-                    carrera: (row[carreraKey] || "S/D").toString(), 
-                    carnet: row[carnetKey], 
-                    res, score10, nivel, 
-                    scores: { 
-                        academic: (res.academic * 10).toFixed(1), 
-                        permanence: (res.permanence * 10).toFixed(1), 
-                        wellbeing: (res.wellbeing * 10).toFixed(1), 
-                        socioeconomic: (res.socioeconomic * 10).toFixed(1), 
-                        health_family: (res.health_family * 10).toFixed(1) 
-                    } 
-                };
-            });
-
-            updateCareerOptions();
-            document.getElementById('welcomeReel').classList.add('hidden');
-            document.getElementById('statsContainer').classList.remove('hidden');
-            updateUI();
-        }
-
-        function updateUI() {
-            document.getElementById('kpiTotal').innerText = studentsData.length;
-            document.getElementById('kpiHigh').innerText = studentsData.filter(s => s.nivel === 'Alto').length;
-            document.getElementById('kpiMedium').innerText = studentsData.filter(s => s.nivel === 'Medio').length;
-            document.getElementById('kpiLow').innerText = studentsData.filter(s => s.nivel === 'Bajo').length;
-            
-            if (studentsData.length > 0) {
-                const avgRisk = studentsData.reduce((a, b) => a + b.score10, 0) / studentsData.length;
-                // ACTUALIZAR NUEVOS INDICADORES
-                document.getElementById('kpiAvgRisk').innerText = avgRisk.toFixed(1);
-                document.getElementById('kpiAvgScore').innerText = Math.round((1 - (avgRisk / 10)) * 100) + "%";
-            }
-            renderCharts(); 
-            renderTable();
-        }
-
-        function renderCharts() {
-            // Distribución de Riesgo
-            const counts = { Alto: 0, Medio: 0, Bajo: 0 };
-            studentsData.forEach(s => counts[s.nivel]++);
-            if(charts.dist) charts.dist.destroy();
-            charts.dist = new Chart(document.getElementById('chartDistribution'), { 
-                type: 'doughnut', 
-                data: { 
-                    labels: ['Alto', 'Medio', 'Bajo'], 
-                    datasets: [{ data: [counts.Alto, counts.Medio, counts.Bajo], backgroundColor: ['#ef4444', '#f59e0b', '#10b981'], borderWidth: 0 }] 
-                }, 
-                options: { cutout: '75%', plugins: { legend: { position: 'bottom' }, datalabels: { display: false } } } 
-            });
-
-            // Radar Promedio
-            const avg = (k) => (studentsData.reduce((a, b) => a + parseFloat(b.scores[k]), 0) / (studentsData.length || 1)).toFixed(2);
-            if(charts.cat) charts.cat.destroy();
-            charts.cat = new Chart(document.getElementById('chartCategories'), { 
-                type: 'radar', 
-                data: { 
-                    labels: ['Académico', 'Permanencia', 'Salud Mental', 'Económico', 'Entorno'], 
-                    datasets: [{ label: 'Promedio Poblacional', data: [avg('academic'), avg('permanence'), avg('wellbeing'), avg('socioeconomic'), avg('health_family')], borderColor: '#fb923c', backgroundColor: 'rgba(251, 146, 60, 0.2)', borderWidth: 3 }] 
-                }, 
-                options: { scales: { r: { min: 0, max: 10, ticks: { display: false } } }, plugins: { legend: { display: false }, datalabels: { display: false } } } 
-            });
-
-            // Barras Facultades
-            const facCounts = {};
-            const total = studentsData.length || 1;
-            studentsData.forEach(s => {
-                const f = s.facultad || "No Especificada";
-                facCounts[f] = (facCounts[f] || 0) + 1;
-            });
-            const facLabels = Object.keys(facCounts).sort();
-            const facValues = facLabels.map(l => facCounts[l]);
-            const palette = ['#1e293b', '#312e81', '#1e1b4b', '#134e4a', '#4c1d95', '#581c87', '#701a75'];
-
-            if(charts.fac) charts.fac.destroy();
-            charts.fac = new Chart(document.getElementById('chartFaculties'), {
-                type: 'bar',
-                data: { labels: facLabels, datasets: [{ label: 'Estudiantes', data: facValues, backgroundColor: facLabels.map((_, i) => palette[i % palette.length]), borderRadius: 6, barThickness: 24 }] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { 
-                        legend: { display: false },
-                        datalabels: {
-                            display: true,
-                            anchor: 'end',
-                            align: 'right',
-                            color: '#64748b',
-                            font: { size: 10, weight: 'bold' },
-                            formatter: (value) => `${((value/total)*100).toFixed(1)}%`
-                        }
-                    },
-                    scales: {
-                        x: { beginAtZero: true, grid: { display: false } },
-                        y: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } }
-                    }
-                }
-            });
-        }
-
-        function renderTable() {
-            const body = document.getElementById('studentTableBody');
-            const facF = document.getElementById('filterFacultad').value;
-            const carF = document.getElementById('filterCarrera').value;
-            const riskF = document.getElementById('filterRiesgo').value;
-            
-            const filtered = studentsData.filter(s => 
-                (facF === 'all' || s.facultad === facF) && 
-                (carF === 'all' || s.carrera === carF) && 
-                (riskF === 'all' || s.nivel === riskF)
-            );
-            
-            document.getElementById('studentCount').innerText = `(${filtered.length})`;
-            body.innerHTML = '';
-            filtered.forEach(s => {
-                let riskColor = s.nivel === "Alto" ? "text-red-600" : (s.nivel === "Medio" ? "text-orange-500" : "text-green-600");
-                const tr = document.createElement('tr');
-                tr.onclick = () => openStudentModal(s);
-                tr.className = "hover:bg-slate-50 transition-all border-b group";
-                tr.innerHTML = `
-                    <td class="p-6">
-                        <div class="font-bold text-slate-800 text-sm">${s.nombre}</div>
-                        <div class="text-[9px] text-slate-400 font-bold uppercase">${s.facultad}</div>
-                    </td>
-                    <td class="p-6 text-center">${getRiskBar(s.scores.academic)}</td>
-                    <td class="p-6 text-center">${getRiskBar(s.scores.permanence)}</td>
-                    <td class="p-6 text-center">${getRiskBar(s.scores.wellbeing)}</td>
-                    <td class="p-6 text-center">${getRiskBar(s.scores.socioeconomic)}</td>
-                    <td class="p-6 text-center">${getRiskBar(s.scores.health_family)}</td>
-                    <td class="p-6 text-center text-xs font-black text-indigo-700">${s.score10.toFixed(1)}</td>
-                    <td class="p-6 text-center"><span class="text-sm font-black uppercase ${riskColor}">${s.nivel}</span></td>
-                `;
-                body.appendChild(tr);
-            });
-        }
-
-        function getRiskBar(val10) {
-            let color = "#10b981"; if (val10 >= 7) color = "#ef4444"; else if (val10 >= 4) color = "#f59e0b";
-            return `<div class="mini-bar mx-auto"><div class="mini-bar-fill" style="width: ${val10*10}%; background: ${color}"></div></div>`;
-        }
-
-        function openStudentModal(s) {
-            selectedStudent = s;
-            document.getElementById('modalName').innerText = s.nombre;
-            
-            const updateField = (rowId, textId, value) => {
-                const row = document.getElementById(rowId);
-                const text = document.getElementById(textId);
-                if (value && value.toString().trim() !== "") { text.innerText = value; row.classList.remove('hidden'); } 
-                else { row.classList.add('hidden'); }
-            };
-            
-            updateField('row-faculty', 'modalFaculty', s.facultad);
-            updateField('row-career', 'modalCareer', s.carrera);
-            updateField('row-email', 'modalEmail', s.email);
-            
-            document.getElementById('modalRiskScoreDisplay').innerText = s.score10.toFixed(1) + "/10";
-            let color = s.nivel === "Alto" ? "text-red-600" : (s.nivel === "Medio" ? "text-orange-500" : "text-green-600");
-            document.getElementById('modalRiskBadge').innerText = s.nivel;
-            document.getElementById('modalRiskBadge').className = `inline-block px-10 py-3 rounded-full text-xs font-black uppercase text-center ${color}`;
-            
-            const details = document.getElementById('modalIndicatorsDetails');
-            const labels = ["Académico", "Permanencia", "Mental", "Económico", "Entorno"];
-            const scoresArr = [s.scores.academic, s.scores.permanence, s.scores.wellbeing, s.scores.socioeconomic, s.scores.health_family];
-            
-            details.innerHTML = '';
-            labels.forEach((lbl, i) => {
-                let v = parseFloat(scoresArr[i]);
-                let ic = v >= 7.0 ? "text-red-600" : (v >= 4.0 ? "text-orange-600" : "text-green-600");
-                details.innerHTML += `<div class="p-5 bg-white border rounded-[2rem] shadow-sm"><span class="font-black text-slate-500 uppercase text-[10px] block mb-1">${lbl}</span><span class="font-black ${ic} text-lg">${v.toFixed(1)}/10</span></div>`;
-            });
-            
-            document.getElementById('aiPlanContainer').classList.add('hidden');
-            if(modalChartInstance) modalChartInstance.destroy();
-            modalChartInstance = new Chart(document.getElementById('modalRadarChart'), { 
-                type: 'radar', 
-                data: { labels, datasets: [{ data: scoresArr, backgroundColor: 'rgba(79, 70, 229, 0.2)', borderColor: '#4338ca', borderWidth: 3 }] }, 
-                options: { scales: { r: { min: 0, max: 10, ticks: { display: false } } }, plugins: { legend: { display: false }, datalabels: { display: false } } } 
-            });
-            document.getElementById('studentModal').classList.add('show');
-        }
-
-        function exportToExcel() {
-            if(!studentsData.length) return;
-            const data = studentsData.map(s => ({ Nombre: s.nombre, Email: s.email, Facultad: s.facultad, Carrera: s.carrera, Riesgo: s.nivel, Score: s.score10.toFixed(2) }));
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new(); 
-            XLSX.utils.book_append_sheet(wb, ws, "Resultados");
-            XLSX.writeFile(wb, "Auditoria_Riesgo_Estudiantil.xlsx");
-        }
-
-        function showSection(id) { 
-            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden')); 
-            document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active')); 
-            document.getElementById(`section-${id}`).classList.remove('hidden'); 
-            document.getElementById(`btn-${id}`).classList.add('active'); 
-        }
-
-        function toggleTools() { document.getElementById('toolsDropdown').classList.toggle('show'); }
-        function clearConsole() { document.getElementById('consoleLog').innerHTML = '> Terminal purgada.'; }
-
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0]; if (!file) return;
-            document.getElementById('toolsDropdown').classList.remove('show');
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const workbook = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-                processFile(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]));
-                showSection('dashboard');
-                sysLog(`Carga exitosa: ${file.name}`, 'success');
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        document.getElementById('filterFacultad').addEventListener('change', updateCareerOptions);
-        document.getElementById('filterCarrera').addEventListener('change', renderTable);
-        document.getElementById('filterRiesgo').addEventListener('change', renderTable);
-        
-        window.onclick = (e) => { 
-            if (!e.target.closest('#toolsDropdown') && !e.target.closest('button')) {
-                document.getElementById('toolsDropdown').classList.remove('show');
-            }
-        };
-
-        window.onload = () => sysLog("Sistema inicializado. v7.3", "success");
-    </script>
+  <!-- Main application script -->
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
