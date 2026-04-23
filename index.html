@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard Semáforo de Riesgo Estudiantil</title>
+  <title>Risk Intelligence</title>
 
   <!-- Import map for esm.sh modules -->
   <script type="importmap">
@@ -74,7 +74,7 @@
   <div class="main">
     <div class="header">
       <div class="header-main">
-        <h1>Riesgo de Deserción Estudiantil</h1>
+        <h1>Risk Intelligence</h1>
         <p class="header-subtitle">Visualiza la distribución de riesgo y los indicadores académicos clave.</p>
       </div>
       <div class="header-meta">
@@ -135,6 +135,17 @@
 
               <strong style="margin-top:8px;display:block">Objetivo</strong>
               <p style="margin:6px 0 0 0;color:#374151">Proveer una vista rápida e interactiva del semáforo de riesgo, distribuir y filtrar registros, y detectar inconsistencias en los datos fuente.</p>
+
+              <strong style="margin-top:8px;display:block">Paso a paso para usar la herramienta</strong>
+              <ol style="margin:6px 0 0 0;color:#374151;padding-left:18px;line-height:1.5">
+                <li><strong>Preparar archivo:</strong> Asegúrate de que el archivo .xlsx tenga las columnas requeridas (nombre, facultad, carrera y los indicadores descritos en el documento).</li>
+                <li><strong>Cargar datos:</strong> Ve a Herramientas → Seleccionar archivo → Cargar datos. Espera la confirmación de procesamiento.</li>
+                <li><strong>Explorar Dashboard:</strong> Revisa la distribución de riesgo y el radar de indicadores en la sección Dashboard.</li>
+                <li><strong>Filtrar registros:</strong> Usa los filtros por facultad, carrera, búsqueda por nombre y nivel de riesgo en la sección Estudiantes para acotar la lista.</li>
+                <li><strong>Ver detalle de un estudiante:</strong> Haz clic en una fila de estudiante para abrir el detalle y revisar indicadores individuales (las métricas 'Riesgo' se muestran como porcentaje cuando aplica).</li>
+                <li><strong>Verificación de datos:</strong> Revisa la sección Verificación para ver errores y advertencias detectadas y corregir el archivo fuente si es necesario.</li>
+                <li><strong>Iterar:</strong> Corrige y vuelve a cargar el archivo según las advertencias para obtener resultados más confiables.</li>
+              </ol>
 
               <strong style="margin-top:8px;display:block">Resumen del documento de indicadores</strong>
               <p style="margin:6px 0 0 0;color:#374151">
