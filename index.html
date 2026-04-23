@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Risk Intelligence</title>
+
+  <!-- Import map for esm.sh modules -->
+  <script type="importmap">
+  {
+    "imports": {
+      "xlsx": "https://esm.sh/xlsx@0.18.5",
+      "chart.js": "https://esm.sh/chart.js@4.4.0",
+      "chart.js/auto": "https://esm.sh/chart.js@4.4.0/auto"
+    }
+  }
+  </script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">IR</div>
+      <div class="brand-text">
+        <span class="brand-title">Risk Intelligence</span>
+        <span class="brand-subtitle">Semáforo de Deserción</span>
+      </div>
+    </div>
+
+    <nav>
+      <ul>
+        <li class="menu-item active" data-section="herramientas">
+          <span class="menu-icon">🛠️</span>
+          <span class="menu-label">Herramientas</span>
+        </li>
+        <li class="menu-item" data-section="dashboard">
+          <span class="menu-icon">📊</span>
+          <span class="menu-label">Dashboard</span>
+        </li>
+        <li class="menu-item" data-section="estudiantes">
+          <span class="menu-icon">👥</span>
+          <span class="menu-label">Estudiantes</span>
+        </li>
+        <li class="menu-item" data-section="informes">
+          <span class="menu-icon">🧾</span>
+          <span class="menu-label">Informes</span>
+        </li>
+        <li class="menu-item" data-section="verificacion">
+          <span class="menu-icon">✅</span>
+          <span class="menu-label">Verificación</span>
+        </li>
+        <li class="menu-item" data-section="ayuda">
+          <span class="menu-icon">❓</span>
+          <span class="menu-label">Ayuda y soporte</span>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-copyright" style="font-size:12px;color:#9ca3af;padding:6px 4px;border-top:1px solid rgba(148,163,184,0.12);">
+      © Carlos Alfredo Castillo Flores - ITCPO - 2026 · v1.8
+    </div>
+
+    <div class="tools hidden" id="herramientasPanel">
+      <h4>Herramientas</h4>
+      <p class="tools-hint">Carga un archivo .xlsx para calcular el índice de riesgo de deserción.</p>
+      <label class="file-input-label">
+        <span>Seleccionar archivo</span>
+        <input type="file" id="fileInput" accept=".xlsx" />
+      </label>
+      <div id="selectedFileName" class="selected-file-name" aria-live="polite"></div>
+      <div id="uploadMessage" class="upload-message" aria-live="polite" role="status" style="display:none"></div>
+      <button id="upload">Cargar datos</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <div class="header-main">
+        <h1>Risk Intelligence</h1>
+        <p class="header-subtitle">Visualiza la distribución de riesgo y los indicadores académicos clave.</p>
+      </div>
+      <div class="header-meta">
+        <span class="badge-pill">Powered by ITCPO</span>
+      </div>
+    </div>
+
+    <div class="container">
+      <div id="dashboardSection" class="section">
+        <div class="grid">
+          <div class="card card-chart">
+          <div class="card-header">
+            <h2>Distribución de riesgo</h2>
+            <span class="card-caption">Clasificación por nivel de riesgo</span>
+          </div>
+          <div class="card-body chart-wrapper">
+            <div class="bar-container">
+              <canvas id="chart" width="400" height="180"></canvas>
+            </div>
+            <!-- radar chart for visible indicators -->
+            <div class="radar-container" style="height:320px;margin-top:18px;">
+              <canvas id="radarChart" width="600" height="240"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="column" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card card-summary">
+            <div class="card-header">
+              <h2>Resumen general</h2>
+              <span class="card-caption">Promedios y conteos agregados</span>
+            </div>
+            <div class="card-body" id="summary"></div>
+          </div>
+
+          <div class="card card-additional">
+            <div class="card-header">
+              <h2>Resumen de registros por Facultad</h2>
+              <span class="card-caption">Top facultades por número de registros</span>
+            </div>
+            <div class="card-body" id="additionalSummary">
+              <!-- Contenido generado dinámicamente -->
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div id="informesSection" class="section hidden">
+        <div class="card">
+          <div class="card-header">
+            <h2>Informes — Seguimiento por períodos</h2>
+            <span class="card-caption">Filtra por Facultad, Carrera y Riesgo antes de generar el reporte PDF</span>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select id="reportFaculty">
+                <option value="">Seleccione Facultad</option>
+              </select>
+              <select id="reportCareer">
+                <option value="">Seleccione Carrera</option>
+              </select>
+              <select id="reportRisk">
+                <option value="">Seleccione Riesgo</option>
+                <option value="ALTO">ALTO</option>
+                <option value="MEDIO">MEDIO</option>
+                <option value="BAJO">BAJO</option>
+              </select>
+              <button id="renderReportBtn" style="min-width:160px;background:linear-gradient(135deg,#16a34a,#059669);box-shadow:0 8px 18px rgba(5,150,105,0.18)">Mostrar listado</button>
+              <button id="exportStatsBtn" style="min-width:160px;background:linear-gradient(135deg,#f97316,#ef4444);box-shadow:0 8px 18px rgba(249,115,22,0.18);margin-left:6px">Exportar estadísticas (Word)</button>
+              <button id="exportExcelBtn" style="min-width:160px;background:linear-gradient(135deg,#7c3aed,#4c1d95);box-shadow:0 8px 18px rgba(92,53,160,0.18);margin-left:6px">Exportar listado (Excel)</button>
+            </div>
+
+            <div id="reportArea" style="overflow:auto;max-height:52vh;border-radius:10px;border:1px solid #eef2f6;padding:8px;background:#fff;margin-top:6px">
+              <table id="reportTable" style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr style="background:#fbfbfc;border-bottom:1px solid #eef2f6">
+                    <th style="padding:8px;text-align:left">Nombre</th>
+                    <th style="padding:8px;text-align:left">Email</th>
+                    <th style="padding:8px;text-align:left">Teléfono</th>
+                    <th style="padding:8px;text-align:left">Riesgo</th>
+                  </tr>
+                </thead>
+                <tbody id="reportTableBody">
+                  <tr><td colspan="4" style="padding:12px;color:#6b7280;text-align:center">No hay datos. Aplique filtros y pulse "Mostrar listado".</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="ayudaSection" class="section hidden">
+        <div class="card">
+          <div class="card-header">
+            <h2>Ayuda y soporte</h2>
+            <span class="card-caption">Información breve, objetivo y resumen de indicadores</span>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;color:#374151;line-height:1.4">
+              <strong>Introducción</strong>
+              <p style="margin:6px 0 0 0;color:#374151">Esta aplicación visualiza el índice de riesgo de deserción estudiantil y permite explorar datos por facultad, carrera y estudiante para apoyar decisiones académicas.</p>
+
+              <strong style="margin-top:8px;display:block">Objetivo</strong>
+              <p style="margin:6px 0 0 0;color:#374151">Proveer una vista rápida e interactiva del semáforo de riesgo, distribuir y filtrar registros, y detectar inconsistencias en los datos fuente.</p>
+
+              <strong style="margin-top:8px;display:block">Paso a paso para usar la herramienta</strong>
+              <ol style="margin:6px 0 0 0;color:#374151;padding-left:18px;line-height:1.5">
+                <li><strong>Preparar archivo:</strong> Asegúrate de que el archivo .xlsx tenga las columnas requeridas (nombre, facultad, carrera y los indicadores descritos en el documento).</li>
+                <li><strong>Cargar datos:</strong> Ve a Herramientas → Seleccionar archivo → Cargar datos. Espera la confirmación de procesamiento.</li>
+                <li><strong>Explorar Dashboard:</strong> Revisa la distribución de riesgo y el radar de indicadores en la sección Dashboard.</li>
+                <li><strong>Filtrar registros:</strong> Usa los filtros por facultad, carrera, búsqueda por nombre y nivel de riesgo en la sección Estudiantes para acotar la lista.</li>
+                <li><strong>Ver detalle de un estudiante:</strong> Haz clic en una fila de estudiante para abrir el detalle y revisar indicadores individuales (las métricas 'Riesgo' se muestran como porcentaje cuando aplica).</li>
+                <li><strong>Verificación de datos:</strong> Revisa la sección Verificación para ver errores y advertencias detectadas y corregir el archivo fuente si es necesario.</li>
+                <li><strong>Iterar:</strong> Corrige y vuelve a cargar el archivo según las advertencias para obtener resultados más confiables.</li>
+              </ol>
+
+              <strong style="margin-top:8px;display:block">Resumen del documento de indicadores</strong>
+              <p style="margin:6px 0 0 0;color:#374151">
+                El documento explica la metodología paso a paso para construir el Índice de Riesgo de Deserción (IRD): primero se recogen indicadores clave por estudiante (promedio académico, asistencia y número de asignaturas aprobadas) y se normalizan para hacerlos comparables. El promedio académico se transforma mediante z-score (desviación respecto a la media de la cohorte) y se invierte para que valores bajos de rendimiento incrementen el riesgo; asistencia y asignaturas aprobadas se normalizan por min-max para obtener valores entre 0 y 1 y luego se invierten cuando corresponda (por ejemplo, baja asistencia = mayor riesgo). Cada componente recibe un peso (ej. rendimiento 40%, asistencia 30%, aprobadas 30%) y se combinan en una única puntuación IRD que se utiliza para clasificar en tres niveles: Bajo, Medio y Alto (umbrales definidos en el documento). 
+                Además se describe una columna textual complementaria (Sem_Z) que, si está presente y contiene etiquetas como "Alto/Medio/Bajo", se prioriza como etiqueta final; en caso contrario se usa el IRD para asignar el nivel. El PDF incluye las convenciones de nombres de columnas esperadas, códigos de variables, ejemplos de limpieza de datos (tratamiento de valores faltantes, formatos numéricos y valores atípicos) y recomendaciones para preparar el archivo antes de cargarlo en la aplicación.
+              </p>
+
+              <strong style="margin-top:8px;display:block">Acceso al documento</strong>
+              <p style="margin:6px 0 0 0;color:#374151">Si desea más información puede consultar el archivo PDF para detalles completos sobre la metodología e indicadores.</p>
+
+              <div style="margin-top:12px;padding:10px 0 0 0;border-top:1px solid #eef2f6">
+                <strong style="display:block;margin-bottom:6px">Sobre el informe "Seguimiento por períodos"</strong>
+                <p style="margin:0 0 8px 0;color:#374151;font-size:13px;line-height:1.4">
+                  Este informe genera un listado filtrado por Facultad, Carrera y Nivel de Riesgo que sirve para el seguimiento de estudiantes en tres períodos. Use "Mostrar listado" para visualizar en pantalla los registros que cumplen los filtros seleccionados.
+                </p>
+                <p style="margin:0 0 8px 0;color:#374151;font-size:13px;line-height:1.4">
+                  Botones disponibles:
+                  <ul style="margin:6px 0 6px 18px;color:#374151;font-size:13px">
+                    <li><strong>Mostrar listado</strong>: muestra en pantalla los estudiantes filtrados.</li>
+                    <li><strong>Exportar estadísticas (Word)</strong>: descarga un documento con el resumen y gráficos del Dashboard (útil para informes rápidos).</li>
+                    <li><strong>Exportar listado (Excel)</strong>: descarga el listado filtrado con las columnas de firma y seguimiento (Firma1/Seguimiento1/Observaciones1 ... Firma3/Seguimiento3/Observaciones3) para uso en hojas de trabajo.</li>
+                  </ul>
+                </p>
+                <div style="margin-top:8px;color:#6b7280;font-size:12px">© Carlos Alfredo Castillo Flores - ITCPO - 2026 · v1.8</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="verificacionSection" class="section">
+        <div class="card">
+          <div class="card-header">
+            <h2>Verificación</h2>
+            <span class="card-caption">Errores y advertencias detectadas en los registros</span>
+          </div>
+          <div class="card-body">
+            <div id="verificationList" style="font-size:13px;color:#374151;max-height:60vh;overflow:auto">
+              <!-- Lista de errores generada dinámicamente -->
+              <div style="color:#6b7280">No hay datos cargados.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="estudiantesSection" class="section hidden">
+        <div class="card students-card">
+          <div class="card-header students-header">
+            <div>
+              <h2>Estudiantes</h2>
+              <span class="card-caption">Filtra y analiza el riesgo individual</span>
+              <div class="students-count" id="studentsCount" style="margin-top:6px;font-size:12px;color:#6b7280">Registros: 0</div>
+            </div>
+            <div class="students-filters">
+              <select id="facultyFilter">
+                <option value="">Todas las facultades</option>
+              </select>
+              <select id="careerFilter">
+                <option value="">Todas las carreras</option>
+              </select>
+
+              <!-- Live search by student name -->
+              <input id="studentSearch" type="search" placeholder="Buscar por nombre..." style="min-width:160px;padding:10px;border-radius:8px;border:1px solid #d1d5db;font-size:13px;">
+
+              <select id="riskFilter">
+                <option value="">Todos los niveles de riesgo</option>
+                <option value="ALTO">Riesgo alto</option>
+                <option value="MEDIO">Riesgo medio</option>
+                <option value="BAJO">Riesgo bajo</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body students-body">
+            <div class="students-table">
+              <div id="studentsList" class="students-rows">
+                <!-- filas de estudiantes generadas dinámicamente -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+
+
+  <div id="studentDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="studentDetailTitle">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-panel" role="document">
+      <header class="modal-header">
+        <h3 id="studentDetailTitle">Detalle del estudiante</h3>
+        <button class="modal-close" id="modalCloseBtn" aria-label="Cerrar">&times;</button>
+      </header>
+      <div class="modal-body" id="studentDetailBody">
+        <!-- populated dynamically -->
+        <div class="student-grid">
+          <div class="group">
+            <h4>Identificación</h4>
+            <div class="field"><span class="label">Nombre</span><span class="value" id="mdNombre"></span></div>
+            <div class="field"><span class="label">Carnet</span><span class="value" id="mdCarnet"></span></div>
+            <div class="field"><span class="label">Email</span><span class="value" id="mdEmail"></span></div>
+            <div class="field"><span class="label">Teléfono</span><span class="value" id="mdTelefono"></span></div>
+          </div>
+
+          <div class="group">
+            <h4>Ubicación</h4>
+            <div class="field"><span class="label">Dirección</span><span class="value" id="mdDireccion"></span></div>
+            <div class="field"><span class="label">Facultad</span><span class="value" id="mdFacultad"></span></div>
+            <div class="field"><span class="label">Carrera</span><span class="value" id="mdCarrera"></span></div>
+            <div class="field"><span class="label">Riesgo</span><span class="value" id="mdRiesgo"></span></div>
+          </div>
+
+          <div class="group">
+            <h4>Académicos</h4>
+            <div class="field"><span class="label">Promedio (PromPer1)</span><span class="value" id="mdPromPer1"></span></div>
+            <div class="field"><span class="label">Asistencia (PromAsisPer1)</span><span class="value" id="mdPromAsisPer1"></span></div>
+            <div class="field"><span class="label">Asignaturas inscritas</span><span class="value" id="mdInscritas"></span></div>
+            <div class="field"><span class="label">Asignaturas retiradas</span><span class="value" id="mdRetiradas"></span></div>
+          </div>
+
+          <div class="group wide">
+            <h4>Indicadores</h4>
+            <div id="mdIndicators" class="indicators-list"></div>
+          </div>
+        </div>
+      </div>
+      <footer class="modal-footer">
+        <button id="modalCloseAction">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+  <script>
+    // simple menu interactions to toggle content sections (keeps layout extensible)
+    const items = document.querySelectorAll('.sidebar .menu-item');
+    const toolsPanel = document.getElementById('herramientasPanel');
+    const dashboardSection = document.getElementById('dashboardSection');
+    const estudiantesSection = document.getElementById('estudiantesSection');
+    const verificacionSection = document.getElementById('verificacionSection');
+    // ensure ayudaSection is referenced to avoid calling hide/show on undefined
+    const ayudaSection = document.getElementById('ayudaSection');
+
+    function show(el) { el && el.classList.remove('hidden'); }
+    function hide(el) { el && el.classList.add('hidden'); }
+
+    function updatePanels(activeItem) {
+      const section = activeItem.getAttribute('data-section');
+
+      if (section === 'herramientas') {
+        show(toolsPanel);
+        show(dashboardSection);
+        hide(estudiantesSection);
+        hide(verificacionSection);
+        hide(ayudaSection);
+      } else if (section === 'dashboard') {
+        hide(toolsPanel);
+        show(dashboardSection);
+        hide(estudiantesSection);
+        hide(verificacionSection);
+        hide(ayudaSection);
+      } else if (section === 'estudiantes') {
+        hide(toolsPanel);
+        hide(dashboardSection);
+        show(estudiantesSection);
+        hide(verificacionSection);
+        hide(ayudaSection);
+        hide(document.getElementById('informesSection'));
+      } else if (section === 'informes') {
+        hide(toolsPanel);
+        hide(dashboardSection);
+        hide(estudiantesSection);
+        hide(verificacionSection);
+        hide(ayudaSection);
+        show(document.getElementById('informesSection'));
+      } else if (section === 'verificacion') {
+        hide(toolsPanel);
+        hide(dashboardSection);
+        hide(estudiantesSection);
+        show(verificacionSection);
+        hide(ayudaSection);
+        hide(document.getElementById('informesSection'));
+        // if the verification renderer is available from app.js, call it
+        if (window.renderVerification) window.renderVerification();
+      } else if (section === 'ayuda') {
+        hide(toolsPanel);
+        hide(dashboardSection);
+        hide(estudiantesSection);
+        hide(verificacionSection);
+        hide(document.getElementById('informesSection'));
+        show(ayudaSection);
+      }
+    }
+
+    items.forEach(it => it.addEventListener('click', () => {
+      items.forEach(i => i.classList.remove('active'));
+      it.classList.add('active');
+      updatePanels(it);
+    }));
+
+    // Initial state: ensure tools panel visibility matches the active menu item
+    const initialActive = document.querySelector('.sidebar .menu-item.active');
+    if (initialActive) updatePanels(initialActive);
+  </script>
+</body>
+</html>
