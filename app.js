@@ -1155,7 +1155,168 @@ function renderReportListing() {
    });
  }
 
-// Populate report filters when data is loaded (hook into existing process)
+/* -------- Login: simple client-side auth (sessionStorage) -------- */
+
+// predefined users (username: password)
+const USER_CREDENTIALS = {
+  admin: 'Santori',
+  vilma: 'V1lm@',
+  marta: 'm@rt@',
+  vidal: 'V1d@l',
+  gloria: 'G1or1@',
+  rocio: 'R0c1o',
+  sofia: '$0f1@',
+  ana: '@na26'
+};
+
+function showLoginModal() {
+  const lm = document.getElementById('loginModal');
+  if (lm) {
+    lm.classList.remove('hidden');
+    // focus username
+    const u = document.getElementById('loginUser');
+    if (u) { u.focus(); u.select(); }
+  }
+}
+
+function hideLoginModal() {
+  const lm = document.getElementById('loginModal');
+  if (lm) lm.classList.add('hidden');
+}
+
+// update header username display and UI state
+function setCurrentUser(username) {
+  const nameEl = document.getElementById('currentUserName');
+  if (nameEl) nameEl.textContent = username ? username : 'Invitado';
+  // if guest, show login modal; otherwise hide it
+  if (!username) {
+    showLoginModal();
+  } else {
+    hideLoginModal();
+  }
+}
+
+// login attempt
+function attemptLogin() {
+  const u = document.getElementById('loginUser');
+  const p = document.getElementById('loginPass');
+  const err = document.getElementById('loginError');
+  if (!u || !p) return;
+  const user = (u.value || '').toString().trim();
+  const pass = (p.value || '').toString();
+  if (!user || !pass) {
+    if (err) { err.style.display = 'block'; err.textContent = 'Ingrese usuario y contraseña.'; }
+    return;
+  }
+  const expected = USER_CREDENTIALS[user];
+  if (expected && expected === pass) {
+    // success: store session and update UI
+    sessionStorage.setItem('ri_current_user', user);
+    setCurrentUser(user);
+    if (err) { err.style.display = 'none'; err.textContent = ''; }
+  } else {
+    if (err) { err.style.display = 'block'; err.textContent = 'Credenciales incorrectas.'; }
+    // clear password for security
+    p.value = '';
+    p.focus();
+  }
+}
+
+ // clear application-loaded data and UI
+ function clearAppData() {
+   // clear in-memory arrays
+   data = [];
+   processed = [];
+   indicatorKeys = [];
+   detectedKeys = { name: null, faculty: null, career: null };
+
+   // destroy charts if present
+   try { if (chartInstance) { chartInstance.destroy(); chartInstance = null; } } catch (e) { /* ignore */ }
+   try { if (radarInstance) { radarInstance.destroy(); radarInstance = null; } } catch (e) { /* ignore */ }
+
+   // reset DOM areas
+   const studentsListEl = document.getElementById('studentsList');
+   if (studentsListEl) studentsListEl.innerHTML = '';
+
+   const summaryElLocal = document.getElementById('summary');
+   if (summaryElLocal) summaryElLocal.innerHTML = '';
+
+   const additionalEl = document.getElementById('additionalSummary');
+   if (additionalEl) additionalEl.innerHTML = '';
+
+   const verificationEl = document.getElementById('verificationList');
+   if (verificationEl) verificationEl.innerHTML = '<div style="color:#6b7280">No hay datos cargados.</div>';
+
+   // reset report filters and table
+   const rf = document.getElementById('reportFaculty');
+   const rc = document.getElementById('reportCareer');
+   const rtb = document.getElementById('reportTableBody');
+   if (rf) rf.innerHTML = '<option value="">Seleccione Facultad</option>';
+   if (rc) rc.innerHTML = '<option value="">Seleccione Carrera</option>';
+   if (rtb) rtb.innerHTML = '<tr><td colspan="4" style="padding:12px;color:#6b7280;text-align:center">No hay datos. Aplique filtros y pulse &quot;Mostrar listado&quot;.</td></tr>';
+
+   // reset students filters and counts
+   const facultyFilterEl = document.getElementById('facultyFilter');
+   const careerFilterEl = document.getElementById('careerFilter');
+   const studentsCountEl = document.getElementById('studentsCount');
+   if (facultyFilterEl) facultyFilterEl.innerHTML = '<option value=\"\">Todas las facultades</option>';
+   if (careerFilterEl) careerFilterEl.innerHTML = '<option value=\"\">Todas las carreras</option>';
+   if (studentsCountEl) studentsCountEl.textContent = 'Registros: 0';
+
+   // clear file input UI
+   try { if (fileInput) fileInput.value = ''; } catch (e) {}
+   const selName = document.getElementById('selectedFileName');
+   if (selName) selName.textContent = '';
+
+   // clear upload message if any
+   const uploadMessageEl = document.getElementById('uploadMessage');
+   if (uploadMessageEl) { uploadMessageEl.style.display = 'none'; uploadMessageEl.textContent = ''; }
+
+   // ensure panels reflect empty state: show tools panel (optional)
+   const toolsPanel = document.getElementById('herramientasPanel');
+   const dashboardSection = document.getElementById('dashboardSection');
+   const estudiantesSection = document.getElementById('estudiantesSection');
+   if (toolsPanel) toolsPanel.classList.remove('hidden');
+   if (dashboardSection) dashboardSection.classList.remove('hidden');
+   if (estudiantesSection) estudiantesSection.classList.add('hidden');
+ }
+
+ // logout
+ function logout() {
+   // remove session
+   sessionStorage.removeItem('ri_current_user');
+   // clear all loaded data/UI
+   clearAppData();
+   // update UI to logged-out state and show login modal
+   setCurrentUser(null);
+ }
+
+// wire login controls
+document.addEventListener('click', (ev) => {
+  const t = ev.target;
+  if (!t) return;
+  if (t.id === 'loginBtn') attemptLogin();
+  if (t.id === 'logoutBtn') logout();
+});
+
+// support Enter key on login fields
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
+    const lm = document.getElementById('loginModal');
+    if (lm && !lm.classList.contains('hidden')) {
+      attemptLogin();
+    }
+  }
+});
+
+// on load: restore session or show login
+window.addEventListener('DOMContentLoaded', () => {
+  const current = sessionStorage.getItem('ri_current_user');
+  if (current) setCurrentUser(current);
+  else showLoginModal();
+});
+
+/* -------- Populate report filters when data is loaded (hook into existing process) -------- */
 const originalProcessData = processData;
 processData = function() {
   originalProcessData();

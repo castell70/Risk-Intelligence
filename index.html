@@ -60,7 +60,7 @@
     </nav>
 
     <div class="sidebar-copyright" style="font-size:12px;color:#9ca3af;padding:6px 4px;border-top:1px solid rgba(148,163,184,0.12);">
-      © Carlos Alfredo Castillo Flores - ITCPO - 2026 · v1.8
+      © Carlos Alfredo Castillo Flores - ITCPO - 2026 · v2.21
     </div>
 
     <div class="tools hidden" id="herramientasPanel">
@@ -82,8 +82,15 @@
         <h1>Risk Intelligence</h1>
         <p class="header-subtitle">Visualiza la distribución de riesgo y los indicadores académicos clave.</p>
       </div>
-      <div class="header-meta">
+      <div class="header-meta" style="display:flex;align-items:center;gap:10px">
         <span class="badge-pill">Powered by ITCPO</span>
+        <!-- logged-in username appears here -->
+        <div id="currentUserContainer" style="font-size:13px;color:#374151;display:flex;flex-direction:column;align-items:flex-start">
+          <span style="font-size:11px;color:#6b7280">Usuario</span>
+          <span id="currentUserName" style="font-weight:600;color:#0f172a">Invitado</span>
+        </div>
+        <!-- logout / exit icon -->
+        <button id="logoutBtn" title="Cerrar sesión" style="background:transparent;border:none;color:#0f172a;font-size:18px;display:flex;align-items:center;padding:6px;cursor:pointer" aria-label="Cerrar sesión">🔓</button>
       </div>
     </div>
 
@@ -218,7 +225,7 @@
                     <li><strong>Exportar listado (Excel)</strong>: descarga el listado filtrado con las columnas de firma y seguimiento (Firma1/Seguimiento1/Observaciones1 ... Firma3/Seguimiento3/Observaciones3) para uso en hojas de trabajo.</li>
                   </ul>
                 </p>
-                <div style="margin-top:8px;color:#6b7280;font-size:12px">© Carlos Alfredo Castillo Flores - ITCPO - 2026 · v1.8</div>
+                <div style="margin-top:8px;color:#6b7280;font-size:12px">© Carlos Alfredo Castillo Flores - ITCPO - 2026 · v2.21</div>
               </div>
             </div>
           </div>
@@ -325,6 +332,33 @@
       </div>
       <footer class="modal-footer">
         <button id="modalCloseAction">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Login modal -->
+  <div id="loginModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle" style="align-items:center;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel" role="document" style="max-width:420px;padding:18px;">
+      <header class="modal-header">
+        <h3 id="loginTitle">Acceso de usuario</h3>
+      </header>
+      <div class="modal-body" style="padding-top:6px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="font-size:13px;color:#6b7280">Usuario
+            <input id="loginUser" type="text" placeholder="Usuario" style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #e5e7eb">
+          </label>
+          <label style="font-size:13px;color:#6b7280">Contraseña
+            <input id="loginPass" type="password" placeholder="Contraseña" style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #e5e7eb">
+          </label>
+          <div id="loginError" style="color:#e74c3c;font-size:13px;display:none"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+            <button id="loginBtn" style="min-width:120px">Ingresar</button>
+          </div>
+        </div>
+      </div>
+      <footer class="modal-footer" style="justify-content:space-between">
+        <div style="font-size:12px;color:#6b7280">Bienvenidos a Risk Intelligence, por favor coloque sus credenciales</div>
       </footer>
     </div>
   </div>
