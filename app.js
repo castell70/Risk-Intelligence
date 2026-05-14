@@ -279,16 +279,17 @@ function showStudentDetails(globalIndex){
   if(!modal) return;
   const s = processed.find(p => p._idx === globalIndex);
   if(!s) return;
-  // fill fields (attempt to read common property keys from indicators if present)
+  // fill basic identification fields
   document.getElementById('mdNombre').textContent = safeText(s.nombre);
-  // common alternatives for carnet/email/direccion/telefono may be in indicators; attempt to find them
+
+  // indicators map
   const ind = s.indicators || {};
+
+  // attempt to read contact and location fields (non-indicators)
   const carnet = s.carnet || ind['Carnet'] || ind['carnet'] || ind['ID'] || ind['id'] || '';
   const email = ind['Email'] || ind['email'] || ind['Correo'] || ind['correo'] || ind['Email_ins'] || ind['email_ins'] || ind['email_inscripcion'] || '';
   const direccion = ind['Direccion'] || ind['direccion'] || ind['Domicilio'] || '';
   const telefono = ind['tel_cel'] || ind['Tel_Cel'] || ind['TEL_CEL'] || ind['Telefono'] || ind['telefono'] || ind['Tel'] || ind['tel'] || '';
-  const inscritas = ind['Inscritas'] || ind['Asignaturas_Inscritas'] || ind['inscritas'] || ind['Asignaturas'] || '';
-  const retiradas = ind['Retiradas'] || ind['Asignaturas_Retiradas'] || ind['retiradas'] || '';
 
   document.getElementById('mdCarnet').textContent = safeText(carnet);
   document.getElementById('mdEmail').textContent = safeText(email);
@@ -299,54 +300,39 @@ function showStudentDetails(globalIndex){
   document.getElementById('mdCarrera').textContent = safeText(s.carrera);
   document.getElementById('mdRiesgo').textContent = safeText(s.riesgo);
 
+  // Academic numbers: prefer common indicator keys, fallback to computed fields
+  const inscritas = ind['Inscritas'] ?? ind['Asignaturas_Inscritas'] ?? ind['inscritas'] ?? ind['Asignaturas'] ?? '';
+  const aprobadas = ind['Aprobadas'] ?? ind['aprobadas'] ?? ind['Asignaturas_Aprobadas'] ?? ind['asignaturas_aprobadas'] ?? s.aprobadas ?? '';
+  const reprobadas = ind['Reprobadas'] ?? ind['reprobadas'] ?? ind['Asignaturas_Reprobadas'] ?? ind['reprobadas_asignaturas'] ?? '';
+  const retiradas = ind['Retiradas'] ?? ind['Asignaturas_Retiradas'] ?? ind['retiradas'] ?? '';
+
   // Prefer PromPer1/Promedio fields from indicators or the computed prom
   const promPer = ind['PromPer1'] ?? ind['Promedio'] ?? ind['promedio'] ?? s.prom ?? '';
   const asisPer = ind['PromAsisPer1'] ?? ind['PromAsis'] ?? ind['PromAsisPer'] ?? ind['Asistencia'] ?? s.asistencia ?? '';
-  // show PromPer1 / promedio with one decimal
+
   document.getElementById('mdPromPer1').textContent = (promPer !== '') ? safeText(Number(promPer).toFixed(1)) : '';
   document.getElementById('mdPromAsisPer1').textContent = (asisPer !== '') ? `${safeText(Number(asisPer).toFixed(1))}%` : '';
 
-  document.getElementById('mdInscritas').textContent = safeText(inscritas);
-  document.getElementById('mdRetiradas').textContent = safeText(retiradas);
+  // populate academic counts into the academic column
+  const mdIns = document.getElementById('mdInscritas');
+  const mdAprob = document.getElementById('mdAprobadas');
+  const mdRepro = document.getElementById('mdReprobadas');
+  const mdRet = document.getElementById('mdRetiradas');
+  if(mdIns) mdIns.textContent = safeText(inscritas);
+  if(mdAprob) mdAprob.textContent = safeText(aprobadas);
+  if(mdRepro) mdRepro.textContent = safeText(reprobadas);
+  if(mdRet) mdRet.textContent = safeText(retiradas);
 
-  // indicators list: show remaining indicator key-value pairs for readability
+  // indicators list: ONLY show risk-related indicators (keys that include "riesgo" case-insensitive or start with "Riesgo")
   const indListEl = document.getElementById('mdIndicators');
   indListEl.innerHTML = '';
 
-  // Exclude noisy or redundant fields from the indicators display (case-insensitive)
-  const excludeFields = new Set([
-    'carnet','email_ins','email','email_inscripcion','sede','decanato','facultad_encuesta','direccion','tel_cel',
-    // fields requested to be removed from indicators display
-    'inscritas','retiradas','promper1','promasisper1','notatotal','prompp1','asisp1','riesgo_acad','asis_baja',
-    'z_acad','v1','v2','v3','v4','v5','v6'
-  ]);
-  const allKeys = Object.keys(ind);
+  const allKeys = Object.keys(ind || {});
+  // select only keys that look like risk indicators (contain 'riesgo' case-insensitive) or exact matches like 'risk' variants
+  const riskKeys = allKeys.filter(k => /riesgo/i.test(k) || /\brisk\b/i.test(k));
 
-  // Keep only fields up to and including "Notaaprobar" (case-insensitive); drop fields after that
-  let cutoffIndex = allKeys.findIndex(k => (k || '').toString().toLowerCase() === 'notaaprobar');
-  let keptKeys;
-  if (cutoffIndex === -1) {
-    // if Notaaprobar not present, keep all initially
-    keptKeys = allKeys.slice();
-  } else {
-    // include Notaaprobar itself and drop anything that comes after
-    keptKeys = allKeys.slice(0, cutoffIndex + 1);
-  }
-
-  // Exclude noisy or redundant fields (case-insensitive)
-  keptKeys = keptKeys.filter(k => !excludeFields.has((k || '').toString().toLowerCase()));
-
-  // Find any additional keys that start with "Riesgo" (case-insensitive) and ensure they are included,
-  // but avoid duplicates. These will be converted to percentage display below.
-  const riesgoKeys = allKeys.filter(k => /^riesgo/i.test(k));
-  riesgoKeys.forEach(k => {
-    if (!keptKeys.includes(k) && !excludeFields.has((k || '').toString().toLowerCase())) {
-      keptKeys.push(k);
-    }
-  });
-
-  // limit to a reasonable number to avoid UI overflow
-  const keys = keptKeys.slice(0, 40);
+  // Keep order stable and limit to avoid overflow
+  const keys = riskKeys.slice(0, 40);
 
   if(keys.length){
     keys.forEach(k => {
@@ -358,29 +344,16 @@ function showStudentDetails(globalIndex){
       const val = document.createElement('div');
       val.className = 'ind-val';
 
-      // Handle specific formatting rules:
-      // - Riesgo* fields: convert numeric to percentage (value * 100) with one decimal
-      // - Porcent_Rep: treat as percentage (value * 100) with one decimal
-      // - Promp1: show numeric with one decimal
-      if (/^riesgo/i.test(k) || /^porcent[_\s-]*rep$/i.test(k)) {
-        const raw = ind[k];
-        const num = Number(raw);
-        if (!isNaN(num)) {
-          const pct = (num * 100);
-          val.textContent = `${(Math.round(pct * 10) / 10).toFixed(1)}%`.replace('.0%','%');
-        } else {
-          val.textContent = safeText(raw);
-        }
-      } else if (/^promp1$/i.test(k) || /^promper1$/i.test(k)) {
-        const raw = ind[k];
-        const num = Number(raw);
-        if (!isNaN(num) && raw !== '') {
-          val.textContent = `${(Math.round(num * 10) / 10).toFixed(1)}`;
-        } else {
-          val.textContent = safeText(raw);
-        }
+      const raw = ind[k];
+      const num = Number(raw);
+
+      // If numeric risk score between 0..1, display as percentage with one decimal
+      if (!isNaN(num) && raw !== '' && Math.abs(num) <= 1.5) {
+        const pct = (num * 100);
+        val.textContent = `${(Math.round(pct * 10) / 10).toFixed(1)}%`.replace('.0%','%');
       } else {
-        val.textContent = safeText(ind[k]);
+        // otherwise print raw text
+        val.textContent = safeText(raw);
       }
 
       div.appendChild(label);
@@ -388,7 +361,7 @@ function showStudentDetails(globalIndex){
       indListEl.appendChild(div);
     });
   } else {
-    indListEl.innerHTML = '<div style="color:#6b7280">No hay indicadores adicionales.</div>';
+    indListEl.innerHTML = '<div style="color:#6b7280">No hay indicadores de riesgo disponibles.</div>';
   }
 
   modal.classList.remove('hidden');
@@ -921,17 +894,25 @@ function renderReportListing() {
     return;
   }
 
-  // render each row with name, email, phone, signature blank, and three empty checkbox cells
+  // render each row with name, email, phone, aprobadas, reprobadas, integracion and riesgo
   const html = rows.map(r => {
     const ind = r.indicators || {};
     const email = findEmailInIndicators(ind) || '';
     const tel = ind['Telefono'] || ind['telefono'] || ind['Tel'] || ind['tel'] || ind['tel_cel'] || '';
-    // render a simpler row: Nombre, Email, Teléfono, Riesgo
+
+    // Attempt to read common variants for the requested columns
+    const aprobadas = safeText(ind['Aprobadas'] ?? ind['aprobadas'] ?? ind['Asignaturas_Aprobadas'] ?? ind['asignaturas_aprobadas'] ?? r.aprobadas ?? '');
+    const reprobadas = safeText(ind['Reprobadas'] ?? ind['reprobadas'] ?? ind['Asignaturas_Reprobadas'] ?? ind['reprobadas_asignaturas'] ?? '');
+    const integracion = safeText(ind['Integracion'] ?? ind['integracion'] ?? ind['Integración'] ?? ind['integracion_academica'] ?? '');
+
     return `
       <tr>
         <td style="padding:8px;border-bottom:1px solid #f1f5f9">${(r.nombre || '').toString().slice(0,80)}</td>
         <td style="padding:8px;border-bottom:1px solid #f1f5f9">${safeText(email)}</td>
         <td style="padding:8px;border-bottom:1px solid #f1f5f9">${safeText(tel)}</td>
+        <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${aprobadas}</td>
+        <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${reprobadas}</td>
+        <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${integracion}</td>
         <td style="padding:8px;border-bottom:1px solid #f1f5f9">${safeText(r.riesgo)}</td>
       </tr>
     `;
