@@ -871,6 +871,152 @@ function updateGenerateState() {
 if (reportCareer) reportCareer.addEventListener('change', updateGenerateState);
 if (reportRisk)  reportRisk.addEventListener('change', updateGenerateState);
 
+/* -------- Intelligent analysis: identify highest-risk students and generate suggestions -------- */
+function generateSuggestionForStudent(s) {
+  // s: processed row with IRD, prom, asistencia, aprobadas, indicators...
+  const suggestions = [];
+
+  // Prioridad de entrevista
+  suggestions.push('Priorizar entrevista inmediata: indagar barreras académicas y personales.');
+
+  // Academics: if promedio bajo, sugerir plan académico
+  if (s.prom !== undefined && !isNaN(Number(s.prom)) && Number(s.prom) < 2.75) {
+    suggestions.push('Ofrecer acompañamiento académico: plan de recuperación, tutorías y metas concretas.');
+  }
+
+  // Asistencia: si baja, sugerir monitoreo y estrategias de asistencia
+  if (s.asistencia !== undefined && !isNaN(Number(s.asistencia)) && Number(s.asistencia) < 75) {
+    suggestions.push('Abordar asistencia: acordar plan de asistencia, registro y seguimiento semanal.');
+  }
+
+  // Aprobadas: si pocas aprobadas, priorizar medidas de refuerzo y revisión de carga
+  if (s.aprobadas !== undefined && !isNaN(Number(s.aprobadas)) && Number(s.aprobadas) <= 2) {
+    suggestions.push('Revisar carga académica y ofrecer refuerzos o asesorías focalizadas.');
+  }
+
+  // Riesgo textual
+  if (s.riesgo === 'ALTO') {
+    suggestions.push('Considerar derivación a consejería y activar plan de intervención multidisciplinario.');
+  }
+
+  // default short-term actions
+  suggestions.push('Asignar responsable de seguimiento y citas de control (cada 2-4 semanas).');
+  suggestions.push('Registrar compromisos y evidencias en el sistema de seguimiento.');
+
+  return suggestions;
+}
+
+function analyzeRiskIntelligently() {
+  const area = document.getElementById('smartAnalysisArea');
+  if (!area) return;
+
+  const fac = reportFaculty ? reportFaculty.value : '';
+  const car = reportCareer ? reportCareer.value : '';
+  const risk = reportRisk ? reportRisk.value : '';
+
+  // select rows using same filter logic as report listing
+  const rows = processed.filter(r => {
+    if (fac && r.facultad !== fac) return false;
+    if (car && r.carrera !== car) return false;
+    if (risk && r.riesgo !== risk) return false;
+    return true;
+  });
+
+  if (!rows.length) {
+    area.style.display = 'block';
+    area.innerHTML = `<div style="color:#6b7280">No hay registros para el análisis inteligente con los filtros seleccionados.</div>`;
+    return;
+  }
+
+  // sort by IRD descending (higher IRD => higher risk); ensure numeric
+  const sorted = rows.slice().sort((a,b) => (b.IRD || 0) - (a.IRD || 0));
+
+  // include all matching rows for focused action (no hard limit)
+  const top = sorted; // previously limited to 8; now show all that match filters
+
+  // aggregate overview suggestions
+  const overview = [];
+  const avgIRD = (rows.reduce((s,x)=>s+(x.IRD||0),0)/rows.length) || 0;
+  overview.push(`<strong>Total registros analizados:</strong> ${rows.length}`);
+  overview.push(`<strong>IRD promedio:</strong> ${avgIRD.toFixed(3)}`);
+  overview.push(`<strong>Top prioridad (mostrando ${top.length}):</strong>`);
+
+  // Build HTML for the selected students with tailored suggestions
+  const studentsHtml = top.map(s => {
+    const sug = generateSuggestionForStudent(s);
+    const prom = s.prom !== undefined && s.prom !== null ? Number(s.prom).toFixed(2) : '';
+    const asis = s.asistencia !== undefined && s.asistencia !== null ? Number(s.asistencia).toFixed(1) + '%' : '';
+    const aprob = s.aprobadas !== undefined && s.aprobadas !== null ? safeText(s.aprobadas) : '';
+    const lines = sug.map(u => `<li>${u}</li>`).join('');
+    return `
+      <div style="padding:8px;border-radius:8px;border:1px solid #eef2f6;margin-bottom:8px;background:#fff">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <div style="font-weight:700;color:#0f172a">${safeText(s.nombre)}</div>
+          <div style="font-size:13px;color:#6b7280">Riesgo: <strong style="color:#e74c3c">${s.riesgo}</strong> · IRD: ${Number(s.IRD || 0).toFixed(3)}</div>
+        </div>
+        <div style="font-size:13px;color:#374151;margin-top:6px">Promedio: ${prom} · Asistencia: ${asis} · Aprobadas: ${aprob}</div>
+        <ul style="margin:8px 0 0 18px;color:#374151">${lines}</ul>
+      </div>
+    `;
+  }).join('');
+
+  // general suggestions based on common signals in the selection
+  const commonSuggestions = [];
+  // if many have low attendance
+  const lowAsisCount = rows.filter(r => r.asistencia !== undefined && Number(r.asistencia) < 75).length;
+  if (lowAsisCount / rows.length > 0.25) {
+    commonSuggestions.push('Alta proporción de estudiantes con baja asistencia: planificar acciones grupales para mejorar retención (comunicaciones y tutorías).');
+  }
+  const lowPromCount = rows.filter(r => r.prom !== undefined && Number(r.prom) < 2.75).length;
+  if (lowPromCount / rows.length > 0.2) {
+    commonSuggestions.push('Varios estudiantes con promedio bajo: coordinar refuerzos y optimizar carga académica.');
+  }
+  if (!commonSuggestions.length) commonSuggestions.push('Mantener seguimiento individual y documentar cada intervención.');
+
+  // compose final HTML
+  area.style.display = 'block';
+  area.innerHTML = `
+    <div style="font-size:13px;color:#0f172a"><strong>Análisis inteligente — resultados y sugerencias</strong></div>
+    <div style="margin-top:8px;color:#374151;font-size:13px">${overview.join(' · ')}</div>
+    <div style="margin-top:12px">${studentsHtml}</div>
+    <div style="margin-top:8px;padding:10px;border-radius:8px;background:#fbfbfc;border:1px solid #eef2f6">
+      <div style="font-weight:700;margin-bottom:6px">Sugerencias generales</div>
+      <ul style="margin:0 0 0 18px;color:#374151">
+        ${commonSuggestions.map(s => `<li>${s}</li>`).join('')}
+      </ul>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:#6b7280">Estos resultados se generan a partir de los campos calculados en esta sesión y deben validarse en la entrevista.</div>
+  `;
+
+  // bring the analysis area into view
+  setTimeout(() => {
+    area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+// wire smart analyze button
+const smartAnalyzeBtn = document.getElementById('smartAnalyzeBtn');
+const clearAnalysisBtn = document.getElementById('clearAnalysisBtn');
+if (smartAnalyzeBtn) {
+  smartAnalyzeBtn.addEventListener('click', () => {
+    // Run analysis using the current user-selected report filters (do NOT overwrite them)
+    analyzeRiskIntelligently();
+  });
+}
+// clear/hide the smart analysis area
+if (clearAnalysisBtn) {
+  clearAnalysisBtn.addEventListener('click', () => {
+    const area = document.getElementById('smartAnalysisArea');
+    if (!area) return;
+    area.style.display = 'none';
+    area.innerHTML = '';
+    // return focus to report controls for quick next action
+    const rf = document.getElementById('reportRisk');
+    if (rf) rf.focus();
+  });
+}
+
+/* -------- Informes: filtros, vista y PDF -------- */
 // build on-screen report listing
 function renderReportListing() {
   if (!reportTableBody) return;

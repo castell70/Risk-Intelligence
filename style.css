@@ -320,6 +320,17 @@ select,input{
   box-sizing:border-box;
 }
 
+/* Smart analysis area: limit height and allow vertical scrolling when results are long */
+#smartAnalysisArea{
+  max-height: 260px;
+  overflow-y: auto;
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #eef2f6;
+  background:#fff;
+  display:none;
+}
+
 .card-summary #summary h3{
   margin-top:0;
 }

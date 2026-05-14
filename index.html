@@ -155,9 +155,16 @@
                 <option value="BAJO">BAJO</option>
               </select>
               <button id="renderReportBtn" style="min-width:160px;background:linear-gradient(135deg,#16a34a,#059669);box-shadow:0 8px 18px rgba(5,150,105,0.18)">Mostrar listado</button>
+              <button id="smartAnalyzeBtn" style="min-width:180px;background:linear-gradient(135deg,#ef4444,#c2410c);box-shadow:0 8px 18px rgba(239,68,68,0.18);margin-left:6px">Análisis inteligente</button>
+              <button id="clearAnalysisBtn" style="min-width:160px;background:linear-gradient(135deg,#94a3b8,#64748b);box-shadow:0 8px 18px rgba(100,116,139,0.12);margin-left:6px">Limpiar análisis</button>
               <button id="exportStatsBtn" style="min-width:160px;background:linear-gradient(135deg,#f97316,#ef4444);box-shadow:0 8px 18px rgba(249,115,22,0.18);margin-left:6px">Exportar estadísticas (Word)</button>
               <button id="exportExcelBtn" style="min-width:160px;background:linear-gradient(135deg,#7c3aed,#4c1d95);box-shadow:0 8px 18px rgba(92,53,160,0.18);margin-left:6px">Exportar listado (Excel)</button>
             </div>
+            <div id="smartAnalysisContainer" style="width:100%;margin-top:10px">
+              <!-- intelligent analysis results will appear here -->
+              <div id="smartAnalysisArea" style="padding:10px;border-radius:10px;border:1px solid #eef2f6;background:#fff;display:none"></div>
+            </div>
+          </div>
 
             <div id="reportArea" style="overflow:auto;max-height:52vh;border-radius:10px;border:1px solid #eef2f6;padding:8px;background:#fff;margin-top:6px">
               <table id="reportTable" style="width:100%;border-collapse:collapse;font-size:13px">
