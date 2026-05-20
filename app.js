@@ -420,7 +420,21 @@ function drawChart(){
     options:{
       responsive:true,
       maintainAspectRatio:false,
-      plugins:{legend:{display:false}}
+      plugins:{
+        legend:{display:false},
+        tooltip: {
+          callbacks: {
+            // show both count and percentage in tooltip
+            label: function(context) {
+              const value = Number(context.parsed.y ?? context.parsed) || 0;
+              const pct = total > 0 ? ((value / total) * 100) : 0;
+              // format like: "Número de estudiantes: 12 (34.3%)"
+              const dsLabel = context.dataset && context.dataset.label ? context.dataset.label : '';
+              return dsLabel ? `${dsLabel}: ${value} (${pct.toFixed(1)}%)` : `${value} (${pct.toFixed(1)}%)`;
+            }
+          }
+        }
+      }
     }
   });
 
@@ -951,7 +965,7 @@ function analyzeRiskIntelligently() {
     return `
       <div style="padding:8px;border-radius:8px;border:1px solid #eef2f6;margin-bottom:8px;background:#fff">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-          <div style="font-weight:700;color:#0f172a">${safeText(s.nombre)}</div>
+          <div style="font-weight:700;color:#0f172a">${safeText(s.nombre)} ${s.carrera ? '(' + safeText(s.carrera) + ')' : ''}</div>
           <div style="font-size:13px;color:#6b7280">Riesgo: <strong style="color:#e74c3c">${s.riesgo}</strong> · IRD: ${Number(s.IRD || 0).toFixed(3)}</div>
         </div>
         <div style="font-size:13px;color:#374151;margin-top:6px">Promedio: ${prom} · Asistencia: ${asis} · Aprobadas: ${aprob}</div>
@@ -1003,14 +1017,32 @@ if (smartAnalyzeBtn) {
     analyzeRiskIntelligently();
   });
 }
-// clear/hide the smart analysis area
+// clear/hide the smart analysis area and also clear report & students listings
 if (clearAnalysisBtn) {
   clearAnalysisBtn.addEventListener('click', () => {
     const area = document.getElementById('smartAnalysisArea');
-    if (!area) return;
-    area.style.display = 'none';
-    area.innerHTML = '';
-    // return focus to report controls for quick next action
+    if (area) {
+      area.style.display = 'none';
+      area.innerHTML = '';
+    }
+
+    // Clear the on-screen report listing (Informes)
+    const rtb = document.getElementById('reportTableBody');
+    if (rtb) {
+      rtb.innerHTML = '<tr><td colspan="7" style="padding:12px;color:#6b7280;text-align:center">No hay datos. Aplique filtros y pulse "Mostrar listado".</td></tr>';
+    }
+
+    // Clear the students listing and reset count (Estudiantes section)
+    const studentsListEl = document.getElementById('studentsList');
+    if (studentsListEl) {
+      studentsListEl.innerHTML = '<div class="students-empty">No hay estudiantes que coincidan con los filtros seleccionados.</div>';
+    }
+    const studentsCountEl = document.getElementById('studentsCount');
+    if (studentsCountEl) {
+      studentsCountEl.textContent = 'Registros: 0';
+    }
+
+    // optionally reset report controls focus to risk selector for quick next action
     const rf = document.getElementById('reportRisk');
     if (rf) rf.focus();
   });

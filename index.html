@@ -398,12 +398,16 @@
         hide(estudiantesSection);
         hide(verificacionSection);
         hide(ayudaSection);
+        // ensure informes stays hidden behind other panels
+        hide(document.getElementById('informesSection'));
       } else if (section === 'dashboard') {
         hide(toolsPanel);
         show(dashboardSection);
         hide(estudiantesSection);
         hide(verificacionSection);
         hide(ayudaSection);
+        // ensure informes stays hidden behind other panels
+        hide(document.getElementById('informesSection'));
       } else if (section === 'estudiantes') {
         hide(toolsPanel);
         hide(dashboardSection);
