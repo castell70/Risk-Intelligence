@@ -255,14 +255,28 @@ function processData(){
       indicators[k] = r[k];
     });
 
+    // try to capture canonical per-period fields from indicators if present (prefer PromP1 / AsisP1)
+    const promP1 = indicators['PromP1'] ?? indicators['PromPer1'] ?? indicators['PromPer_1'] ?? indicators['Promedio'] ?? prom;
+    const asisP1 = indicators['AsisP1'] ?? indicators['PromAsisPer1'] ?? indicators['PromAsisPer'] ?? indicators['Asistencia'] ?? asistencia;
+    const inscritas = indicators['Inscritas'] ?? indicators['Asignaturas_Inscritas'] ?? indicators['inscritas'] ?? '';
+    const retiradas = indicators['Retiradas'] ?? indicators['Asignaturas_Retiradas'] ?? indicators['retiradas'] ?? '';
+    const reprobadas = indicators['Reprobadas'] ?? indicators['reprobadas'] ?? indicators['Asignaturas_Reprobadas'] ?? '';
+
     return {
       _idx: idx,
       nombre,
       facultad,
       carrera,
+      // keep original computed fields
       prom,
       asistencia,
       aprobadas,
+      // prefer period-specific keys for display/analysis
+      promP1: (promP1 === undefined || promP1 === null || promP1 === '') ? (isNaN(prom) ? '' : prom) : promP1,
+      asisP1: (asisP1 === undefined || asisP1 === null || asisP1 === '') ? (isNaN(asistencia) ? '' : asistencia) : asisP1,
+      inscritas,
+      retiradas,
+      reprobadas,
       IRD,
       riesgo,                  // final normalized risk used by app (ALTO/MEDIO/BAJO)
       sem_z: semZRaw,          // raw Sem_Z textual value (if present)
@@ -731,23 +745,48 @@ function renderStudents() {
     return;
   }
 
-  // Only show indicator columns whose header starts with "Cat" (case-sensitive) for clarity.
-  // build visible indicators: those starting with "Cat" plus Zem_z if present (case-insensitive)
+  // Build visible indicator columns:
+  // - Ensure PromP1 (Promedio) and AsisP1 (Asistencia) plus Aprobadas and Reprobadas are shown when present
+  // - Then append categorical "Cat*" indicators (for context)
+  const fixedCols = [];
+  // detect keys that match common variants
+  const promKey = indicatorKeys.find(k => k.toString().toLowerCase() === 'promp1' || k.toString().toLowerCase() === 'promper1' || k.toString().toLowerCase() === 'promedio' || k.toString().toLowerCase().includes('prom'));
+  const asisKey = indicatorKeys.find(k => k.toString().toLowerCase() === 'asisp1' || k.toString().toLowerCase() === 'promasisper1' || k.toString().toLowerCase().includes('asis') || k.toString().toLowerCase().includes('asist'));
+  const aprobKey = indicatorKeys.find(k => k.toString().toLowerCase() === 'aprobadas' || k.toString().toLowerCase() === 'aprobadasp1' || k.toString().toLowerCase().includes('aprob'));
+  const reproKey = indicatorKeys.find(k => k.toString().toLowerCase() === 'reprobadas' || k.toString().toLowerCase().includes('reprob'));
+
+  if (promKey && !fixedCols.includes(promKey)) fixedCols.push(promKey);
+  if (asisKey && !fixedCols.includes(asisKey)) fixedCols.push(asisKey);
+  if (aprobKey && !fixedCols.includes(aprobKey)) fixedCols.push(aprobKey);
+  if (reproKey && !fixedCols.includes(reproKey)) fixedCols.push(reproKey);
+
+  // then include Cat* indicators for additional context
   const catIndicators = indicatorKeys.filter(k => k.startsWith('Cat'));
   const zemIndicator = indicatorKeys.find(k => k.toString().toLowerCase() === 'zem_z' || k.toString().toLowerCase() === 'zemz');
-  const visibleIndicators = [...catIndicators];
-  if (zemIndicator && !visibleIndicators.includes(zemIndicator)) visibleIndicators.push(zemIndicator);
+  const extraIndicators = [];
+  catIndicators.forEach(c => { if (!fixedCols.includes(c)) extraIndicators.push(c); });
+  if (zemIndicator && !fixedCols.includes(zemIndicator) && !extraIndicators.includes(zemIndicator)) extraIndicators.push(zemIndicator);
+
+  const visibleIndicators = [...fixedCols, ...extraIndicators];
 
   // compute grid template: first column wider, then one column per visible indicator, final risk column
   const middleCount = visibleIndicators.length;
   const cols = ['2.2fr', ...Array(middleCount).fill('0.9fr'), '0.9fr'];
   const gridTemplate = cols.join(' ');
 
-  // render header row with only visible indicator columns
+  // render header row with visible columns and friendly labels where possible
   const headerHtml = `
     <div class="students-header-row" style="grid-template-columns: ${gridTemplate};">
       <div class="col-student">Estudiante</div>
-      ${visibleIndicators.map(k => `<div class="col-metric">${k}</div>`).join('')}
+      ${visibleIndicators.map(k => {
+        // friendly mapping for the fixed columns
+        const kl = (k || '').toString().toLowerCase();
+        if (kl === (promKey || '').toString().toLowerCase()) return `<div class="col-metric">Promedio</div>`;
+        if (kl === (asisKey || '').toString().toLowerCase()) return `<div class="col-metric">Asistencia</div>`;
+        if (kl === (aprobKey || '').toString().toLowerCase()) return `<div class="col-metric">Aprobadas</div>`;
+        if (kl === (reproKey || '').toString().toLowerCase()) return `<div class="col-metric">Reprobadas</div>`;
+        return `<div class="col-metric">${k}</div>`;
+      }).join('')}
       <div class="col-metric col-risk">Riesgo</div>
     </div>
   `;
@@ -761,34 +800,43 @@ function renderStudents() {
     return null;
   };
 
-  // render each student row using only visible indicators
+  // render each student row using visible indicators
   const rowsHtml = filtered.map(r => {
     const riskClass = getRiskClass(r.riesgo);
     const indicatorsHtml = visibleIndicators.map(k => {
-      let val = r.indicators ? r.indicators[k] : r[k];
+      // try from indicators map first, fallback to direct property
+      let val = r.indicators ? r.indicators[k] : undefined;
+      if (val === undefined) {
+        // fallback to computed fields for common cases
+        const lowk = (k || '').toString().toLowerCase();
+        if (lowk.includes('prom') && (r.prom !== undefined)) val = r.prom;
+        else if (lowk.includes('asis') && (r.asistencia !== undefined)) val = r.asistencia;
+        else if (lowk.includes('aprob') && (r.aprobadas !== undefined)) val = r.aprobadas;
+        else if (lowk.includes('reprob') && (r.reprobadas !== undefined)) val = r.reprobadas || '';
+        else val = r.indicators ? r.indicators[k] : r[k];
+      }
 
-      // detect if the value is a categorical risk label and color it (do NOT affect the risk column)
+      // detect categorical labels
       if (val !== null && val !== undefined && typeof val !== 'object') {
         const labelInfo = colorForLabel(val);
         if (labelInfo) {
-          // show short label with color
           return `<div class="col-metric"><div class="metric-value" style="color:${labelInfo.color};font-weight:600">${labelInfo.label}</div></div>`;
         }
       }
 
-      if (typeof val === 'number') {
-        const lower = k.toLowerCase();
-        if (lower.includes('asist') || lower.includes('porcentaje') || lower.includes('%')) {
-          return `<div class="col-metric"><div class="metric-value">${Number(val).toFixed(1)}%</div></div>`;
-        }
-        return `<div class="col-metric"><div class="metric-value">${Number(val).toFixed(2)}</div></div>`;
-      } else if (!isNaN(Number(val)) && String(val).trim() !== '') {
+      // format numeric values: Asistencia as percent with one decimal, Promedio with two, counts as integers
+      const lower = (k || '').toString().toLowerCase();
+      const numeric = !isNaN(Number(val)) && String(val).trim() !== '';
+      if (numeric) {
         const num = Number(val);
-        const lower = k.toLowerCase();
-        if (lower.includes('asist') || lower.includes('porcentaje') || lower.includes('%')) {
+        if (lower.includes('asis') || lower.includes('%')) {
           return `<div class="col-metric"><div class="metric-value">${num.toFixed(1)}%</div></div>`;
         }
-        return `<div class="col-metric"><div class="metric-value">${num.toFixed(2)}</div></div>`;
+        if (lower.includes('prom')) {
+          return `<div class="col-metric"><div class="metric-value">${num.toFixed(2)}</div></div>`;
+        }
+        // for approvals/reprobations show integer-like
+        return `<div class="col-metric"><div class="metric-value">${Number.isInteger(num) ? num : num.toFixed(0)}</div></div>`;
       } else {
         return `<div class="col-metric"><div class="metric-value">${String(val ?? '').slice(0,30)}</div></div>`;
       }
@@ -942,11 +990,25 @@ function analyzeRiskIntelligently() {
     return;
   }
 
+  // Recompute component contributions for accuracy using same formulas as processData
+  // Prepare arrays for normalization again to remain consistent
+  const acadArr = data.map(r=>Number(getField(r,['Promedio','promedio','PROMEDIO']))||0);
+  const asistenciaArr = data.map(r=>Number(getField(r,['Asistencia','asistencia','ASISTENCIA','Porcentaje_Asistencia']))||0);
+  const aprobadasArr = data.map(r=>Number(getField(r,['Aprobadas','aprobadas','Asignaturas_Aprobadas','asignaturas_aprobadas']))||0);
+  const normalize = (arr, val) => {
+    const nums = arr.map(n=>Number(n)||0);
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    if(max === min) return 0;
+    return ((Number(val)||0) - min) / (max - min);
+  };
+  const wAcad = 0.40, wAsis = 0.30, wAprob = 0.30;
+
   // sort by IRD descending (higher IRD => higher risk); ensure numeric
   const sorted = rows.slice().sort((a,b) => (b.IRD || 0) - (a.IRD || 0));
 
   // include all matching rows for focused action (no hard limit)
-  const top = sorted; // previously limited to 8; now show all that match filters
+  const top = sorted; // show all that match filters
 
   // aggregate overview suggestions
   const overview = [];
@@ -958,9 +1020,66 @@ function analyzeRiskIntelligently() {
   // Build HTML for the selected students with tailored suggestions
   const studentsHtml = top.map(s => {
     const sug = generateSuggestionForStudent(s);
-    const prom = s.prom !== undefined && s.prom !== null ? Number(s.prom).toFixed(2) : '';
-    const asis = s.asistencia !== undefined && s.asistencia !== null ? Number(s.asistencia).toFixed(1) + '%' : '';
-    const aprob = s.aprobadas !== undefined && s.aprobadas !== null ? safeText(s.aprobadas) : '';
+    // recompute component scores and contributions for display
+    const zAcad = zScore(acadArr, Number(s.prom) || 0);
+    const nAsis = normalize(asistenciaArr, Number(s.asistencia) || 0);
+    const nAprob = normalize(aprobadasArr, Number(s.aprobadas) || 0);
+    const scoreAcad = -zAcad;
+    const scoreAsis = 1 - nAsis;
+    const scoreAprob = 1 - nAprob;
+    const contribAcad = wAcad * (scoreAcad / 3);
+    const contribAsis = wAsis * scoreAsis;
+    const contribAprob = wAprob * scoreAprob;
+
+    // Determine variables of risk according to selected risk filter (ALTO/MEDIO/BAJO)
+    // We'll look for indicator keys whose textual value for this student contains the chosen risk label.
+    const selectedRisk = (risk || '').toString().toLowerCase();
+    let varsHtml = '';
+    if (selectedRisk) {
+      const riskKeys = Object.keys(s.indicators || {}).filter(k => {
+        const raw = s.indicators[k];
+        if (raw === null || raw === undefined) return false;
+        return String(raw).toLowerCase().includes(selectedRisk);
+      });
+      if (riskKeys.length) {
+        varsHtml = riskKeys.slice(0,6).map(k => {
+          const raw = s.indicators[k];
+          // format numeric-looking values; otherwise show raw text
+          const num = Number(raw);
+          const display = (!isNaN(num) && String(raw).trim() !== '') ? (k.toLowerCase().includes('asist') ? `${num.toFixed(1)}%` : (k.toLowerCase().includes('prom') ? Number(num).toFixed(2) : safeText(raw))) : safeText(raw);
+          return `<div style="display:flex;justify-content:space-between;gap:8px"><div style="color:#374151">${k}</div><div style="font-weight:700;color:#0f172a">${display}</div></div>`;
+        }).join('');
+      }
+    }
+
+    // Fallback: if no risk-labeled indicators found, keep the previous component-contribution summary
+    if (!varsHtml) {
+      const comps = [
+        { key: 'Rendimiento (Promedio)', value: Number(s.prom) || 0, contrib: contribAcad },
+        { key: 'Asistencia (%)', value: Number(s.asistencia) || 0, contrib: contribAsis },
+        { key: 'Aprobadas', value: Number(s.aprobadas) || 0, contrib: contribAprob }
+      ];
+      comps.sort((a,b) => Math.abs(b.contrib) - Math.abs(a.contrib));
+      const threshold = 0.05;
+      let topComps = comps.filter(c => Math.abs(c.contrib) > threshold);
+      if (topComps.length === 0) topComps = comps.slice(0,2);
+      varsHtml = topComps.map(c => {
+        const valDisplay = c.key.includes('Asistencia') ? `${Number(c.value).toFixed(1)}%` : (c.key.includes('Promedio') ? Number(c.value).toFixed(2) : safeText(c.value));
+        const sign = (c.contrib >= 0) ? '' : '-';
+        const contribPct = (c.contrib * 100).toFixed(2);
+        return `<div style="display:flex;justify-content:space-between;gap:8px"><div style="color:#374151">${c.key}</div><div style="font-weight:700;color:#0f172a">${valDisplay}</div><div style="color:#6b7280">(${sign}${contribPct})</div></div>`;
+      }).join('');
+    }
+
+    const compsHtml = varsHtml;
+
+    // prefer PromP1 and AsisP1 if available for clearer per-period info, fallback to computed prom/asistencia
+    const promDisplay = (s.promP1 !== undefined && s.promP1 !== null && s.promP1 !== '') ? Number(s.promP1).toFixed ? Number(s.promP1).toFixed(2) : safeText(s.promP1) : (s.prom !== undefined && s.prom !== null ? Number(s.prom).toFixed(2) : '');
+    const asisDisplay = (s.asisP1 !== undefined && s.asisP1 !== null && s.asisP1 !== '') ? (Number(s.asisP1).toFixed ? Number(s.asisP1).toFixed(1) + '%' : safeText(s.asisP1)) : (s.asistencia !== undefined && s.asistencia !== null ? Number(s.asistencia).toFixed(1) + '%' : '');
+    const inscr = (s.inscritas !== undefined && s.inscritas !== null && s.inscritas !== '') ? safeText(s.inscritas) : '';
+    const ret = (s.retiradas !== undefined && s.retiradas !== null && s.retiradas !== '') ? safeText(s.retiradas) : '';
+    const repro = (s.reprobadas !== undefined && s.reprobadas !== null && s.reprobadas !== '') ? safeText(s.reprobadas) : (s.aprobadas !== undefined ? '' : '');
+
     const lines = sug.map(u => `<li>${u}</li>`).join('');
     return `
       <div style="padding:8px;border-radius:8px;border:1px solid #eef2f6;margin-bottom:8px;background:#fff">
@@ -968,7 +1087,13 @@ function analyzeRiskIntelligently() {
           <div style="font-weight:700;color:#0f172a">${safeText(s.nombre)} ${s.carrera ? '(' + safeText(s.carrera) + ')' : ''}</div>
           <div style="font-size:13px;color:#6b7280">Riesgo: <strong style="color:#e74c3c">${s.riesgo}</strong> · IRD: ${Number(s.IRD || 0).toFixed(3)}</div>
         </div>
-        <div style="font-size:13px;color:#374151;margin-top:6px">Promedio: ${prom} · Asistencia: ${asis} · Aprobadas: ${aprob}</div>
+        <div style="font-size:13px;color:#374151;margin-top:6px">
+          Promedio: ${promDisplay} · Asistencia: ${asisDisplay} · Inscritas: ${inscr} · Retiradas: ${ret} · Aprobadas: ${safeText(s.aprobadas)} · Reprobadas: ${repro}
+        </div>
+        <div style="margin-top:8px;padding:8px;border-radius:8px;background:#fbfbfc;border:1px solid #eef2f6">
+          <div style="font-weight:700;margin-bottom:6px">Variables de mayor contribución</div>
+          ${compsHtml}
+        </div>
         <ul style="margin:8px 0 0 18px;color:#374151">${lines}</ul>
       </div>
     `;
@@ -1187,7 +1312,7 @@ function renderReportListing() {
    });
  }
 
- // Export current report listing to Excel (.xlsx)
+ // Export current report listing to Excel (.xlsx) - enhanced: prepend interview suggestions and enable header autofilters
  const exportExcelBtn = document.getElementById('exportExcelBtn');
  if (exportExcelBtn) {
    exportExcelBtn.addEventListener('click', () => {
@@ -1213,12 +1338,46 @@ function renderReportListing() {
          return;
        }
 
-       // Build plain objects for Excel: Nombre, Email, Teléfono, Facultad, Carrera, Riesgo
-       // plus Firma1/Seguimiento1/Observaciones1 ... Firma3/Seguimiento3/Observaciones3 if present in indicators
-       const excelData = rows.map(r => {
+       // Build header for the student table
+       const headers = [
+         'Nombre','Email','Telefono','Facultad','Carrera','Riesgo',
+         'Promedio','Asistencia','Inscritas','Retiradas','Aprobadas','Reprobadas',
+         'Firma1','Seguimiento1','Observaciones1',
+         'Firma2','Seguimiento2','Observaciones2',
+         'Firma3','Seguimiento3','Observaciones3'
+       ];
+
+       // Prepare suggestion rows (one per student) by reusing existing suggestion generator
+       const suggestionRows = rows.map(r => {
+         const sugArr = generateSuggestionForStudent(r); // array of suggestion strings
+         const combined = sugArr.join(' | '); // single cell with suggestions concatenated
+         return { Tipo: 'Sugerencia entrevista', Nombre: r.nombre || '', Facultad: r.facultad || '', Carrera: r.carrera || '', Sugerencias: combined };
+       });
+
+       // Prepare student rows normalized for Excel (same fields as before)
+       const studentRows = rows.map(r => {
          const ind = r.indicators || {};
          const email = findEmailInIndicators(ind) || '';
          const tel = ind['Telefono'] || ind['telefono'] || ind['Tel'] || ind['tel'] || ind['tel_cel'] || '';
+
+         const prom = ind['PromP1'] ?? ind['PromPer1'] ?? ind['Promedio'] ?? ind['promedio'] ?? r.prom ?? '';
+         const asis = ind['AsisP1'] ?? ind['PromAsisPer1'] ?? ind['PromAsisPer'] ?? ind['Asistencia'] ?? r.asistencia ?? '';
+         const inscritas = ind['Inscritas'] ?? ind['Asignaturas_Inscritas'] ?? ind['inscritas'] ?? r.inscritas ?? '';
+         const retiradas = ind['Retiradas'] ?? ind['Asignaturas_Retiradas'] ?? ind['retiradas'] ?? r.retiradas ?? '';
+         const aprobadas = ind['Aprobadas'] ?? ind['aprobadas'] ?? ind['Asignaturas_Aprobadas'] ?? r.aprobadas ?? '';
+         const reprobadas = ind['Reprobadas'] ?? ind['reprobadas'] ?? ind['Asignaturas_Reprobadas'] ?? r.reprobadas ?? '';
+
+         let asisDisplay = '';
+         if (asis !== undefined && asis !== null && String(asis).toString().trim() !== '') {
+           const asNum = Number(asis);
+           asisDisplay = !isNaN(asNum) ? `${asNum.toFixed(1)}%` : String(asis);
+         }
+         let promDisplay = '';
+         if (prom !== undefined && prom !== null && String(prom).toString().trim() !== '') {
+           const pNum = Number(prom);
+           promDisplay = !isNaN(pNum) ? Number(pNum).toFixed(2) : String(prom);
+         }
+
          return {
            Nombre: r.nombre || '',
            Email: safeText(email),
@@ -1226,6 +1385,12 @@ function renderReportListing() {
            Facultad: r.facultad || '',
            Carrera: r.carrera || '',
            Riesgo: r.riesgo || '',
+           Promedio: promDisplay,
+           Asistencia: asisDisplay,
+           Inscritas: safeText(inscritas),
+           Retiradas: safeText(retiradas),
+           Aprobadas: safeText(aprobadas),
+           Reprobadas: safeText(reprobadas),
            Firma1: safeText(ind['Firma1'] ?? ind['Firma_1'] ?? ''),
            Seguimiento1: safeText(ind['Seguimiento1'] ?? ind['Seguimiento_1'] ?? ''),
            Observaciones1: safeText(ind['Observaciones1'] ?? ind['Observaciones_1'] ?? ''),
@@ -1238,10 +1403,54 @@ function renderReportListing() {
          };
        });
 
-       // build workbook and trigger download using XLSX (already imported)
-       const ws = XLSX.utils.json_to_sheet(excelData);
+       // Build a combined sheet: first two header rows for context, then suggestion rows, blank row, then table header + studentRows
+       // We'll construct an array-of-arrays to have fine control
+       const sheetData = [];
+
+       sheetData.push(['Informe generado por Risk Intelligence']);
+       sheetData.push([`Generado: ${(new Date()).toLocaleString()}`]);
+       sheetData.push([]); // empty spacer
+
+       // Insert suggestions block header
+       sheetData.push(['Sugerencias para entrevistas (una fila por estudiante):']);
+       // Push suggestion rows with columns Tipo, Nombre, Facultad, Carrera, Sugerencias
+       sheetData.push(['Tipo','Nombre','Facultad','Carrera','Sugerencias']);
+       suggestionRows.forEach(sr => {
+         sheetData.push([sr.Tipo, sr.Nombre, sr.Facultad, sr.Carrera, sr.Sugerencias]);
+       });
+
+       sheetData.push([]); // empty spacer before main table
+
+       // Add main table header
+       sheetData.push(headers);
+       // add student rows
+       studentRows.forEach(sr => {
+         sheetData.push(headers.map(h => sr[h] ?? ''));
+       });
+
+       // Convert to worksheet and set autofilter on the header row (determine header row index)
+       const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+       // header row is at sheetData.indexOf(headers) -> compute row number (1-based Excel ref)
+       const headerIndex = sheetData.findIndex(row => {
+         if (!row || !row.length) return false;
+         // match if arrays equal in length and values equal to headers[0] etc.
+         return row.length === headers.length && row[0] === headers[0] && row[1] === headers[1];
+       });
+       if (headerIndex >= 0) {
+         const startCol = 'A';
+         const endCol = XLSX.utils.encode_col(headers.length - 1); // e.g. 'S' for many columns
+         const excelHeaderRow = headerIndex + 1; // 1-based
+         ws['!autofilter'] = { ref: `${startCol}${excelHeaderRow}:${endCol}${excelHeaderRow}` };
+       }
+
+       // Freeze top rows so header / suggestions remain visible (freeze first n rows)
+       const freezeRows = headerIndex + 1; // freeze through the header row
+       ws['!freeze'] = { xSplit: 0, ySplit: freezeRows, topLeftCell: 'A' + (freezeRows + 1), activePane: 'bottomLeft' };
+
        const wb = XLSX.utils.book_new();
        XLSX.utils.book_append_sheet(wb, ws, 'Listado');
+
        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
        const url = URL.createObjectURL(blob);
